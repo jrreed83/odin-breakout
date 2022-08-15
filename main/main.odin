@@ -8,9 +8,13 @@ BOARD_R :: 256
 BOARD_T :: 256
 BOARD_B :: 0 
 
-Vector :: struct { x, y: f32}
+Vector :: distinct [2]f32 
 
-Paddle :: struct { position: f32, length: f32, speed: f32}
+Paddle :: struct { 
+    position: f32, 
+    length: f32, 
+    speed: f32
+}
 
 Ball :: struct { 
     position: Vector, 
@@ -18,47 +22,59 @@ Ball :: struct {
     radius: f32
 }
 
-collide :: proc(ball: ^Ball) {
-    vx := ball.velocity.x 
-    vy := ball.velocity.y
+min :: proc(v:Vector) -> f32 { 
+    return v.x < v.y ? v.x : v.y 
+}
 
-    px := ball.position.x 
-    py := ball.position.y
+update_ball :: proc(ball: ^Ball) {
 
+    limits := Vector {
+        (ball.velocity.x < 0) ? f32(BOARD_L) : f32(BOARD_R),
+        (ball.velocity.y < 0) ? f32(BOARD_B) : f32(BOARD_T)
+    }
 
-    tx := vx < 0 ? (BOARD_L - px)/vx : (BOARD_R - px)/vx
-    ty := vy < 0 ? (BOARD_B - py)/vy : (BOARD_T - px)/vy
+    flight_times := (limits - ball.position) / ball.velocity 
+ 
+    flight_time := min(flight_times)
 
-    time_to_collision := tx < ty ? tx : ty 
+    ball.position += flight_time*ball.velocity
 
-    xx := px + time_to_collision*vx 
-    yy := py + time_to_collision*vy
-
-    ball.position.x = xx 
-    ball.position.y = yy 
-
-    ball.velocity.x = -vx
-    ball.velocity.y = +vy
-
+    if flight_times.x < flight_times.y {
+        ball.velocity.x = -ball.velocity.x
+    } else {
+        ball.velocity.y = -ball.velocity.y   
+    }
 
 }
 
 run_game :: proc() {
 
-    //ball := Ball{position = Vector{x=}}
     fmt.println("Running game")
 
     ball := Ball{
         position=Vector{128, 128}, 
-        velocity=Vector{5.0, 1.0}
+        velocity=Vector{3.0, 4.0},
+        radius=1.0
     }
 
     fmt.println(ball)
-    collide(&ball)
+
+    update_ball(&ball)
     fmt.println(ball)
 
+    update_ball(&ball)
+    fmt.println(ball)
+
+    update_ball(&ball)
+    fmt.println(ball)
 }
 
 main :: proc() {
     run_game()
+
+    b := Vector{1.0, 5.3}
+
+    c := Vector{2.0, 5.2}
+
+    fmt.println(c/b)
 }
