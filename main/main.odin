@@ -33,7 +33,6 @@ Block :: struct {
     using shape: Rectangle,
 }
 
-
 Walls :: struct {
     start_positions: [4]Vector,
     end_positions:   [4]Vector
@@ -58,6 +57,10 @@ block_collision :: proc(projectile: ^Ball, block: ^Block) -> bool {
     collision := !(no_collide_from_left || no_collide_from_top || no_collide_from_right || no_collide_from_bottom)
 
     return collision
+}
+
+paddle_collision :: proc(projectile: ^Ball, paddle: ^Paddle) -> bool {
+    return false
 }
 
 //wall_collision :: proc(projectile: ^Rectangle) -> Wall_Collision {
