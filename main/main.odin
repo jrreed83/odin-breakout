@@ -28,17 +28,22 @@ min :: proc(v:Vector) -> f32 {
 
 update_ball :: proc(ball: ^Ball) {
 
+    // Determine the x/y limits of the ball flight
     limits := Vector {
         (ball.velocity.x < 0) ? f32(BOARD_L) : f32(BOARD_R),
         (ball.velocity.y < 0) ? f32(BOARD_B) : f32(BOARD_T)
     }
 
+    // Maximal flight times in the x and y direction
     flight_times := (limits - ball.position) / ball.velocity 
  
+    // Determine the first collistion
     flight_time := min(flight_times)
 
+    // ball position at wall
     ball.position += flight_time*ball.velocity
 
+    // velocity at wall
     if flight_times.x < flight_times.y {
         ball.velocity.x = -ball.velocity.x
     } else {
