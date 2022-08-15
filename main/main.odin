@@ -8,9 +8,12 @@ BOARD_R :: 256
 BOARD_T :: 256
 BOARD_B :: 0 
 
-Vector :: distinct [2]f32 
+N :: 0
+E :: 1 
+S :: 2 
+W :: 3 
 
-Foo :: struct {x, y:f32}
+Vector :: distinct [2]f32 
 
 Paddle :: struct { 
     position: f32, 
@@ -24,48 +27,53 @@ Ball :: struct {
     radius: f32
 }
 
+Rectangle :: struct {
+    position: Vector, // northwest corner
+    width: f32, 
+    height: f32,
+}
+
+Walls :: struct {
+    start_positions: [4]Vector,
+    end_positions:   [4]Vector
+}
+
 Wall :: enum {top, bottom, right, left}
 
 min :: proc(v:Vector) -> f32 { 
     return v.x < v.y ? v.x : v.y 
 }
 
-// ball_destination :: proc(ball: ^Ball) -> (Wall, f32) {
-//     // Determine the x/y limits of the ball flight
-//     limits := Vector {
-//         (ball.velocity.x < 0) ? f32(BOARD_L) : f32(BOARD_R),
-//         (ball.velocity.y < 0) ? f32(BOARD_B) : f32(BOARD_T)
-//     }
+block_collision :: proc(projectile: ^Rectangle, block: ^Rectangle) -> bool {
+    // projectile up and to the left of block
 
-//     // Maximal flight times in the x and y direction
-//     flight_times := (limits - ball.position) / ball.velocity 
- 
-//     wall: Wall 
-//     time: f32 
+    // If any of these are true then there is no collision, because there's
+    // a gap between the blocks
+    no_collide_from_left   := projectile.position.x + projectile.width  <= block.position.x
+    no_collide_from_top    := projectile.position.y + projectile.height <= block.position.y
+    no_collide_from_right  := block.position.x      + block.width       <= projectile.position.x 
+    no_collide_from_bottom := block.position.y      + block.height      <= projectile.position.y 
 
-//     if flight_times.x < flight_times.y {
-        
-//         flight_time := flight_times.x
-//         if ball.velocity.x < 0 {
-//             wall, time = Wall.left, 
-//             return Wall.left, flight_time 
-//         } else {
-//             return Wall.right, flight_time 
-//         }
-        
-//     } else {
-//         flight_time := flight_times.y
-//         if ball.velocity.y < 0 {
-//             return Wall.bottom, flight_times 
-//         } else {
-//             return Wall.right, flight_times 
-//         }
-//     }
+    collision := !(no_collide_from_left || no_collide_from_top || no_collide_from_right || no_collide_from_bottom)
 
-//     return wall, flight_time
+    return collision
+}
 
+wall_collision :: proc(projectile: ^Rectangle) -> bool {
+    // projectile up and to the left of block
 
-// }
+    // If any of these are true then there is no collision, because there's
+    // a gap between the blocks
+    
+    no_collide_from_left   := projectile.position.x + projectile.width  <= block.position.x
+    no_collide_from_top    := projectile.position.y + projectile.height <= block.position.y
+    no_collide_from_right  := block.position.x      + block.width       <= projectile.position.x 
+    no_collide_from_bottom := block.position.y      + block.height      <= projectile.position.y 
+
+    collision := !(no_collide_from_left || no_collide_from_top || no_collide_from_right || no_collide_from_bottom)
+
+    return collision
+}
 
 update_ball :: proc(ball: ^Ball) -> string {
 
@@ -107,21 +115,33 @@ run_game :: proc() {
         velocity=Vector{3.0, 4.0},
         radius=1.0
     }
+    walls: Walls
 
-    fmt.println(ball)
+//    collision(&ball, &walls)
 
-    update_ball(&ball)
-    fmt.println(ball)
+//    fmt.println(ball)
 
-    update_ball(&ball)
-    fmt.println(ball)
+//    update_ball(&ball)
+//    fmt.println(ball)
 
-    update_ball(&ball)
-    fmt.println(ball)
+//    update_ball(&ball)
+//    fmt.println(ball)
+
+//    update_ball(&ball)
+//    fmt.println(ball)
 }
+
+//const dim1 = {x: 5, y: 5, w: 50, h: 50}
+//const dim2 = {x: 20, y: 10, w: 60, h: 40}
 
 main :: proc() {
     run_game()
-    dst, time := ball_destination(nil)
-    fmt.println(dst, time)
+
+    a := Rectangle{position = {5, 5}, width=50, height=50}
+    b := Rectangle{position = {20, 10}, width=60, height=40}
+
+    fmt.println(block_collision(&a, &b))
+//    fmt.println(collision(nil, nil))
+ //   dst, time := ball_destination(nil)
+ //   fmt.println(dst, time)
 }
