@@ -10,6 +10,8 @@ BOARD_B :: 0
 
 Vector :: distinct [2]f32 
 
+Foo :: struct {x, y:f32}
+
 Paddle :: struct { 
     position: f32, 
     length: f32, 
@@ -22,11 +24,50 @@ Ball :: struct {
     radius: f32
 }
 
+Wall :: enum {top, bottom, right, left}
+
 min :: proc(v:Vector) -> f32 { 
     return v.x < v.y ? v.x : v.y 
 }
 
-update_ball :: proc(ball: ^Ball) {
+// ball_destination :: proc(ball: ^Ball) -> (Wall, f32) {
+//     // Determine the x/y limits of the ball flight
+//     limits := Vector {
+//         (ball.velocity.x < 0) ? f32(BOARD_L) : f32(BOARD_R),
+//         (ball.velocity.y < 0) ? f32(BOARD_B) : f32(BOARD_T)
+//     }
+
+//     // Maximal flight times in the x and y direction
+//     flight_times := (limits - ball.position) / ball.velocity 
+ 
+//     wall: Wall 
+//     time: f32 
+
+//     if flight_times.x < flight_times.y {
+        
+//         flight_time := flight_times.x
+//         if ball.velocity.x < 0 {
+//             wall, time = Wall.left, 
+//             return Wall.left, flight_time 
+//         } else {
+//             return Wall.right, flight_time 
+//         }
+        
+//     } else {
+//         flight_time := flight_times.y
+//         if ball.velocity.y < 0 {
+//             return Wall.bottom, flight_times 
+//         } else {
+//             return Wall.right, flight_times 
+//         }
+//     }
+
+//     return wall, flight_time
+
+
+// }
+
+update_ball :: proc(ball: ^Ball) -> string {
 
     // Determine the x/y limits of the ball flight
     limits := Vector {
@@ -43,6 +84,8 @@ update_ball :: proc(ball: ^Ball) {
     // ball position at wall
     ball.position += flight_time*ball.velocity
 
+    // check if the paddle blocks the ball 
+
     // velocity at wall
     if flight_times.x < flight_times.y {
         ball.velocity.x = -ball.velocity.x
@@ -50,7 +93,10 @@ update_ball :: proc(ball: ^Ball) {
         ball.velocity.y = -ball.velocity.y   
     }
 
+    return "ok"
 }
+
+
 
 run_game :: proc() {
 
@@ -76,10 +122,6 @@ run_game :: proc() {
 
 main :: proc() {
     run_game()
-
-    b := Vector{1.0, 5.3}
-
-    c := Vector{2.0, 5.2}
-
-    fmt.println(c/b)
+    dst, time := ball_destination(nil)
+    fmt.println(dst, time)
 }
