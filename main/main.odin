@@ -5,8 +5,8 @@ import "core:math"
 import "core:time"
 import rl "vendor:raylib"
 
-BOARD_HEIGHT :: 1000
-BOARD_WIDTH  :: 1000 
+SCREEN_HEIGHT :: 1000
+SCREEN_WIDTH  :: 1000 
 
 
 EntityKind :: enum u8 {
@@ -15,7 +15,7 @@ EntityKind :: enum u8 {
     Ball,
 }
 
-FRAME_RATE :: 30 
+FRAME_RATE :: 60
 
 dt: f32 = 1.0 / FRAME_RATE
 
@@ -46,7 +46,7 @@ collision :: proc(state: ^GameState) -> CollisionEvent {
     ball, paddle, blocks := state.ball, state.paddle, state.blocks 
 
     // collision with paddle
-    if ball.position.y + ball.height >= paddle.position.y {
+    if ball.position.y + ball.height > paddle.position.y && ball.velocity.y > 0 {
         if paddle.position.x <= ball.position.x + ball.width && ball.position.x <= paddle.position.x + paddle.width {
             return CollisionEvent { kind = .Paddle, side = .North }
         }
@@ -55,7 +55,7 @@ collision :: proc(state: ^GameState) -> CollisionEvent {
     // collision with blocks 
 
     // collistion with wall
-    if ball.position.x + ball.width >= BOARD_WIDTH {
+    if ball.position.x + ball.width >= SCREEN_WIDTH {
         return CollisionEvent { kind = .Wall, side = .East }
     }
 
@@ -67,7 +67,7 @@ collision :: proc(state: ^GameState) -> CollisionEvent {
         return CollisionEvent { kind = .Wall, side = .North }
     }
 
-    if ball.position.y + ball.height >= BOARD_HEIGHT {
+    if ball.position.y + ball.height >= SCREEN_HEIGHT {
         return CollisionEvent { kind = .Wall, side = .South }
     }
 
@@ -88,14 +88,14 @@ init_game_state :: proc() -> GameState {
     state := GameState {
         ball = Entity {
             kind     = .Ball,
-            position = {0.2*BOARD_WIDTH, 0.5*BOARD_HEIGHT}, 
+            position = {0.5*SCREEN_WIDTH, 0.5*SCREEN_HEIGHT}, 
             width    = 10, 
             height   = 10,
-            velocity = {500.0, 100.0}
+            velocity = {3000.0, 100.0}
         },
         paddle = Entity {
             kind     = .Paddle,
-            position = {0.5*BOARD_WIDTH, BOARD_HEIGHT-40.0}, 
+            position = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-40.0}, 
             width    = 60, 
             height   = 40
         }
@@ -110,7 +110,7 @@ init_game_state :: proc() -> GameState {
 
 update :: proc(state: ^GameState) -> bool {
 
-    fmt.println(state.ball)
+    //fmt.println(state.ball)
     // Check for collision
     collision_evt := collision(state)
 
@@ -145,7 +145,7 @@ run_game :: proc() {
             fmt.println("Faiked")
             break
         }
-        time.sleep(30 * time.Millisecond)
+        time.sleep(1 * time.Millisecond)
     }
 
 }
@@ -159,7 +159,7 @@ draw :: proc() {
 }
 
 main :: proc() {
-	rl.InitWindow(BOARD_WIDTH, BOARD_HEIGHT, "Tetroid")
+	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Tetroid")
 	defer rl.CloseWindow() 
     rl.SetTargetFPS(30)
 
@@ -183,6 +183,10 @@ main :: proc() {
 
         draw()
 
+        cnt += 1
+        fmt.println(cnt)
     }
+
+    fmt.println(state.paddle)
     //run_game()
 }
