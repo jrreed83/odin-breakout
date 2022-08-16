@@ -2,9 +2,11 @@ package main
 
 import "core:fmt"
 import "core:math"
+import "core:time"
 
 BOARD_HEIGHT :: 1000
 BOARD_WIDTH  :: 1000 
+
 
 EntityKind :: enum u8 {
     paddle,
@@ -13,7 +15,9 @@ EntityKind :: enum u8 {
     wall
 }
 
-dt: f32 = 1.0/30 
+FRAME_RATE :: 30 
+
+dt: f32 = 1.0 / FRAME_RATE
 
 Side :: enum u8 {
     north, east, south, west
@@ -43,7 +47,7 @@ collision :: proc(state: ^GameState) -> CollisionEvent {
 
     // collision with paddle
     if ball.position.y + ball.height >= paddle.position.y {
-        if paddle.position.x <= ball.position.x && ball.position.x <= paddle.position.x + paddle.width {
+        if paddle.position.x <= ball.position.x + ball.width && ball.position.x <= paddle.position.x + paddle.width {
             return CollisionEvent { kind = .paddle, side = .north }
         }
     }
@@ -72,54 +76,22 @@ collision :: proc(state: ^GameState) -> CollisionEvent {
 
 }
 
-//collision :: proc(r0: ^Entity, r1: ^Entity) -> bool {
-    // projectile up and to the left of block
-
-    // If any of these are true then there is no collision, because there's a gap between the blocks
-//    no_collide_from_left   := r0.position.x  + r0.width   <= r1.position.x
-//    no_collide_from_top    := r0.position.y  + r0.height  <= r1.position.y
-//    no_collide_from_right  := r1.position.x  + r1.width   <= r0.position.x 
-//    no_collide_from_bottom := r1.position.y  + r1.height  <= r0.position.y 
-
-//    collision := !(no_collide_from_left || no_collide_from_top || no_collide_from_right || no_collide_from_bottom)
-
-//    return collision
-//}
-
-//collision(ball: ^Entity) -> Wall {
-//    
-//    if ball.position.x + ball.width >= BOARD_WIDTH {
-//        return Wall.east
-//   }
-
-//    if ball.position.x <= 0 {
-//        return Wall.west 
-//    }
-
-//     if ball.position.y <= 0 {
-//         return Wall.north
-//     }
-
-//     if ball.position.y + ball.height >= BOARD_HEIGHT {
-//         return Wall.south
-//     }
-
-//     return Wall.none
-// }
 
 GameState :: struct {
      ball:       Entity,
      paddle:     Entity,
-     blocks: [32]Entity
+     blocks: [32]Entity,
+
 }
 
 init_game_state :: proc() -> GameState {
     state := GameState {
         ball = Entity {
             kind     = .ball,
-            position = {0.5*BOARD_WIDTH, BOARD_HEIGHT-42.0}, 
+            position = {0.2*BOARD_WIDTH, 0.5*BOARD_HEIGHT}, 
             width    = 10, 
-            height   = 10
+            height   = 10,
+            velocity = {500.0, 100.0}
         },
         paddle = Entity {
             kind     = .paddle,
@@ -132,44 +104,50 @@ init_game_state :: proc() -> GameState {
     for i in 0..<32 {
         state.blocks[i].kind = .block 
     }
-    
+
     return state 
 }
 
-update :: proc(state: ^GameState) {
+update :: proc(state: ^GameState) -> bool {
 
-    
+    fmt.println(state.ball)
     // Check for collision
     collision_evt := collision(state)
 
-    fmt.println(collision_evt)
-    // Update dynamics
+    if collision_evt.kind == .wall && collision_evt.side == .south {
+        return false
+    }
+    
+    if collision_evt.kind != .none {
+        fmt.println(collision_evt)
+        switch collision_evt.side {
+            case .north, .south:
+                state.ball.velocity.y = -state.ball.velocity.y
+            case .west, .east:
+                state.ball.velocity.x = -state.ball.velocity.x
+        }
 
-    // Run step of dynamics
+    }
+    // time-step
+    state.ball.position += state.ball.velocity*dt
+    return true
 
-//     // Does ball collide with wall ...
-//     // velocity updates
-//     switch wall {
-//     case .north:
-//         ball.velocity.y = -ball.velocity.y
-//     case .south:
-//         ball.velocity.y = -ball.velocity.y
-//     case .east:
-//         ball.velocity.x = -ball.velocity.x 
-//     case .west:
-//         ball.velocity.x = -ball.velocity.x
-//     case .none:
-//         fallthrough 
-//     }
-
-//     // time-step
-//     ball.position += ball.velocity*dt
 }
 
 run_game :: proc() {
 
     state := init_game_state()
-    update(&state)
+
+    for i in 0..<200 {
+        ok := update(&state)
+
+        if !ok {
+            fmt.println("Faiked")
+            break
+        }
+        time.sleep(30 * time.Millisecond)
+    }
+
 }
 
 main :: proc() {
