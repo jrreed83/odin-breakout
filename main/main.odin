@@ -91,11 +91,11 @@ init_game_state :: proc() -> GameState {
             position = {0.5*SCREEN_WIDTH, 0.5*SCREEN_HEIGHT}, 
             width    = 10, 
             height   = 10,
-            velocity = {3000.0, 100.0}
+            velocity = {0, 100.0}
         },
         paddle = Entity {
             kind     = .Paddle,
-            position = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-40.0}, 
+            position = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-200}, 
             width    = 60, 
             height   = 40
         }
@@ -134,21 +134,6 @@ update :: proc(state: ^GameState) -> bool {
 
 }
 
-run_game :: proc() {
-
-    state := init_game_state()
-
-    for i in 0..<200 {
-        ok := update(&state)
-
-        if !ok {
-            fmt.println("Faiked")
-            break
-        }
-        time.sleep(1 * time.Millisecond)
-    }
-
-}
 
 draw :: proc() {
     rl.BeginDrawing()
@@ -159,9 +144,9 @@ draw :: proc() {
 }
 
 main :: proc() {
-	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Tetroid")
+	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
 	defer rl.CloseWindow() 
-    rl.SetTargetFPS(30)
+    rl.SetTargetFPS(FRAME_RATE)
 
     state := init_game_state()
 
@@ -170,19 +155,34 @@ main :: proc() {
     for !rl.WindowShouldClose() {
 
         // update game state
-        if cnt < 1000 { 
-            ok := update(&state)
+        
+        ok := update(&state)
 
-            if !ok {
-                time.sleep(time.Second)
-                fmt.println("Closing...")
-                break
-            }
+        if !ok {
+            time.sleep(time.Second)
+            fmt.println("Closing...")
+            break
         }
-        time.sleep(30 * time.Millisecond)
+
+
+        time.sleep(16 * time.Millisecond)
 
         draw()
+        rl.DrawRectangle(
+            i32(state.ball.position.x), 
+            i32(state.ball.position.y),
+            i32(state.ball.width),
+            i32(state.ball.height),
+            rl.RED
+        )
 
+        rl.DrawRectangle(
+            i32(state.paddle.position.x), 
+            i32(state.paddle.position.y),
+            i32(state.paddle.width),
+            i32(state.paddle.height),
+            rl.GREEN
+        )
         cnt += 1
         fmt.println(cnt)
     }
