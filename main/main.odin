@@ -3,16 +3,16 @@ package main
 import "core:fmt"
 import "core:math"
 import "core:time"
+import rl "vendor:raylib"
 
 BOARD_HEIGHT :: 1000
 BOARD_WIDTH  :: 1000 
 
 
 EntityKind :: enum u8 {
-    paddle,
-    block,
-    ball,
-    wall
+    Paddle,
+    Block,
+    Ball,
 }
 
 FRAME_RATE :: 30 
@@ -20,7 +20,7 @@ FRAME_RATE :: 30
 dt: f32 = 1.0 / FRAME_RATE
 
 Side :: enum u8 {
-    north, east, south, west
+    North, East, South, West
 }
 
 Entity :: struct {
@@ -31,8 +31,8 @@ Entity :: struct {
     height:      f32,
 }
 
-CollisionKind :: enum {
-    paddle, wall, block, none
+CollisionKind :: enum u8 {
+    Paddle, Wall, Block, None
 }
 
 CollisionEvent :: struct {
@@ -48,7 +48,7 @@ collision :: proc(state: ^GameState) -> CollisionEvent {
     // collision with paddle
     if ball.position.y + ball.height >= paddle.position.y {
         if paddle.position.x <= ball.position.x + ball.width && ball.position.x <= paddle.position.x + paddle.width {
-            return CollisionEvent { kind = .paddle, side = .north }
+            return CollisionEvent { kind = .Paddle, side = .North }
         }
     }
 
@@ -56,23 +56,23 @@ collision :: proc(state: ^GameState) -> CollisionEvent {
 
     // collistion with wall
     if ball.position.x + ball.width >= BOARD_WIDTH {
-        return CollisionEvent { kind = .wall, side = .east }
+        return CollisionEvent { kind = .Wall, side = .East }
     }
 
     if ball.position.x <= 0 {
-        return CollisionEvent { kind = .wall, side = .west } 
+        return CollisionEvent { kind = .Wall, side = .West } 
     }
 
     if ball.position.y <= 0 {
-        return CollisionEvent { kind = .wall, side = .north }
+        return CollisionEvent { kind = .Wall, side = .North }
     }
 
     if ball.position.y + ball.height >= BOARD_HEIGHT {
-        return CollisionEvent { kind = .wall, side = .south }
+        return CollisionEvent { kind = .Wall, side = .South }
     }
 
 
-    return CollisionEvent{ kind = .none }
+    return CollisionEvent{ kind = .None }
 
 }
 
@@ -87,14 +87,14 @@ GameState :: struct {
 init_game_state :: proc() -> GameState {
     state := GameState {
         ball = Entity {
-            kind     = .ball,
+            kind     = .Ball,
             position = {0.2*BOARD_WIDTH, 0.5*BOARD_HEIGHT}, 
             width    = 10, 
             height   = 10,
             velocity = {500.0, 100.0}
         },
         paddle = Entity {
-            kind     = .paddle,
+            kind     = .Paddle,
             position = {0.5*BOARD_WIDTH, BOARD_HEIGHT-40.0}, 
             width    = 60, 
             height   = 40
@@ -102,7 +102,7 @@ init_game_state :: proc() -> GameState {
     }
 
     for i in 0..<32 {
-        state.blocks[i].kind = .block 
+        state.blocks[i].kind = .Block 
     }
 
     return state 
@@ -114,16 +114,16 @@ update :: proc(state: ^GameState) -> bool {
     // Check for collision
     collision_evt := collision(state)
 
-    if collision_evt.kind == .wall && collision_evt.side == .south {
+    if collision_evt.kind == .Wall && collision_evt.side == .South {
         return false
     }
     
-    if collision_evt.kind != .none {
+    if collision_evt.kind != .None {
         fmt.println(collision_evt)
         switch collision_evt.side {
-            case .north, .south:
+            case .North, .South:
                 state.ball.velocity.y = -state.ball.velocity.y
-            case .west, .east:
+            case .West, .East:
                 state.ball.velocity.x = -state.ball.velocity.x
         }
 
@@ -150,6 +150,39 @@ run_game :: proc() {
 
 }
 
+draw :: proc() {
+    rl.BeginDrawing()
+    defer rl.EndDrawing()
+
+    rl.ClearBackground(rl.RAYWHITE)
+    rl.DrawText("Congrats!", 500, 500, 20, rl.LIGHTGRAY)    
+}
+
 main :: proc() {
-    run_game()
+	rl.InitWindow(BOARD_WIDTH, BOARD_HEIGHT, "Tetroid")
+	defer rl.CloseWindow() 
+    rl.SetTargetFPS(30)
+
+    state := init_game_state()
+
+    cnt := 0 
+
+    for !rl.WindowShouldClose() {
+
+        // update game state
+        if cnt < 1000 { 
+            ok := update(&state)
+
+            if !ok {
+                time.sleep(time.Second)
+                fmt.println("Closing...")
+                break
+            }
+        }
+        time.sleep(30 * time.Millisecond)
+
+        draw()
+
+    }
+    //run_game()
 }
