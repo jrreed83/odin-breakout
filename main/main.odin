@@ -5,14 +5,19 @@ import "core:math"
 import "core:time"
 import rl "vendor:raylib"
 
-SCREEN_WIDTH  :: 850
-SCREEN_HEIGHT :: 650
-FRAME_RATE    :: 60
-PADDLE_SPEED  :: 100
-BALL_SPEED    :: 150 
+SCREEN_WIDTH     :: 850
+SCREEN_HEIGHT    :: 650
+
+FRAME_RATE       :: 60
+PADDLE_SPEED     :: 100
+BALL_SPEED       :: 150 
+BACKGROUND_COLOR :: rl.BLACK 
+PADDLE_COLOR     :: rl.RED
+BALL_COLOR       :: rl.RED
 
 dt: f32 = 1.0 / FRAME_RATE
 
+score:= 0
 ball_pos:  [2]f32
 ball_vel:  [2]f32 
 ball_size: [2]f32
@@ -33,6 +38,9 @@ Collision :: enum u8 {
     None
 }
 
+Foo :: struct {
+    a: int
+}
 
 collision_ball_paddle :: proc() -> Collision {
 
@@ -105,8 +113,8 @@ init_game_state :: proc() {
     paddle_vel  = {0.0, 0.0}
     paddle_size = {60, 10}
 
-    bricks_pos     = {{100, 100}, {300, 100}, {400, 100}}
-    bricks_size    = {{50, 50}, {50, 50}, {50, 50}}
+    bricks_pos     = {{100, 100}, {130, 100}, {160, 100}}
+    bricks_size    = {{30, 20}, {30, 20}, {30, 20}}
     bricks_visible = {true, true, true} 
 }
 
@@ -161,14 +169,15 @@ draw :: proc() {
     rl.BeginDrawing()
     defer rl.EndDrawing()
 
-    rl.ClearBackground(rl.RAYWHITE)
+    rl.ClearBackground(BACKGROUND_COLOR)
 
+    rl.DrawText("Score: 0", 40, 40, 20, rl.WHITE)
     rl.DrawRectangle(
         i32(ball_pos.x), 
         i32(ball_pos.y),
         i32(ball_size.x),
         i32(ball_size.y),
-        rl.RED
+        BALL_COLOR
     )
 
     rl.DrawRectangle(
@@ -176,7 +185,7 @@ draw :: proc() {
         i32(paddle_pos.y),
         i32(paddle_size.x),
         i32(paddle_size.y),
-        rl.GREEN
+        PADDLE_COLOR
     )  
 
     for i in 0..<len(bricks_pos) {
@@ -225,4 +234,7 @@ main :: proc() {
 
     }
 
+    tmp: [64]u8 
+    a := fmt.bprintf(tmp[:], "Score %d", 10)
+    fmt.println(a)
 }
