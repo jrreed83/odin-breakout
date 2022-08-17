@@ -5,133 +5,99 @@ import "core:math"
 import "core:time"
 import rl "vendor:raylib"
 
-SCREEN_HEIGHT :: 1000
-SCREEN_WIDTH  :: 1000 
-
-
-EntityKind :: enum u8 {
-    Paddle,
-    Block,
-    Ball,
-}
-
-FRAME_RATE :: 60
+SCREEN_WIDTH  :: 850
+SCREEN_HEIGHT :: 650
+FRAME_RATE    :: 60
 
 dt: f32 = 1.0 / FRAME_RATE
 
-Side :: enum u8 {
-    North, East, South, West
+ball_pos:  [2]f32
+ball_vel:  [2]f32 
+ball_size: [2]f32
+
+paddle_pos:  [2]f32 
+paddle_vel:  [2]f32
+paddle_size: [2]f32 
+
+Collision :: enum u8 {
+    North, 
+    East, 
+    South, 
+    West,
+    None
 }
 
-Entity :: struct {
-    kind:        EntityKind,
-    position: [2]f32, // northwest corner
-    velocity: [2]f32,
-    width:       f32, 
-    height:      f32,
-}
 
-CollisionKind :: enum u8 {
-    Paddle, Wall, Block, None
-}
-
-CollisionEvent :: struct {
-    kind:  CollisionKind,
-    index: u8,
-    side:  Side
-}
-
-collision :: proc(state: ^GameState) -> CollisionEvent {
-
-    ball, paddle, blocks := state.ball, state.paddle, state.blocks 
-
-    // collision with paddle
-    if ball.position.y + ball.height > paddle.position.y && ball.velocity.y > 0 {
-        if paddle.position.x <= ball.position.x + ball.width && ball.position.x <= paddle.position.x + paddle.width {
-            return CollisionEvent { kind = .Paddle, side = .North }
+collision_ball_paddle :: proc() -> Collision {
+    if ball_pos.y + ball_size.y > paddle_pos.y && ball_vel.y > 0 {
+        if paddle_pos.x <= ball_pos.x + ball_size.x && ball_pos.x <= paddle_pos.x + paddle_size.x {
+            return .North
         }
+    }    
+    return .None
+}
+
+collision_ball_wall :: proc() -> Collision {
+    
+    if ball_pos.x + ball_size.x >= SCREEN_WIDTH {
+        return .East
     }
 
-    // collision with blocks 
-
-    // collistion with wall
-    if ball.position.x + ball.width >= SCREEN_WIDTH {
-        return CollisionEvent { kind = .Wall, side = .East }
+    if ball_pos.x <= 0 {
+        return .West
     }
 
-    if ball.position.x <= 0 {
-        return CollisionEvent { kind = .Wall, side = .West } 
+    if ball_pos.y <= 0 {
+        return .North
     }
 
-    if ball.position.y <= 0 {
-        return CollisionEvent { kind = .Wall, side = .North }
+    if ball_pos.y + ball_size.y >= SCREEN_HEIGHT {
+        return .South
     }
-
-    if ball.position.y + ball.height >= SCREEN_HEIGHT {
-        return CollisionEvent { kind = .Wall, side = .South }
-    }
-
-
-    return CollisionEvent{ kind = .None }
-
+    return .None
 }
 
 
-GameState :: struct {
-     ball:       Entity,
-     paddle:     Entity,
-     blocks: [32]Entity,
+init_game_state :: proc() {
+
+    ball_pos  = {0.5*SCREEN_WIDTH, 0.5*SCREEN_HEIGHT}
+    ball_vel  = {0, 100.0}
+    ball_size = {10.0, 10.0}
+
+    paddle_pos  = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-100}
+    paddle_vel  = {0.0, 0.0}
+    paddle_size = {60, 40}
 
 }
 
-init_game_state :: proc() -> GameState {
-    state := GameState {
-        ball = Entity {
-            kind     = .Ball,
-            position = {0.5*SCREEN_WIDTH, 0.5*SCREEN_HEIGHT}, 
-            width    = 10, 
-            height   = 10,
-            velocity = {0, 100.0}
-        },
-        paddle = Entity {
-            kind     = .Paddle,
-            position = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-200}, 
-            width    = 60, 
-            height   = 40
-        }
-    }
-
-    for i in 0..<32 {
-        state.blocks[i].kind = .Block 
-    }
-
-    return state 
-}
-
-update :: proc(state: ^GameState) -> bool {
+update :: proc() {
 
     //fmt.println(state.ball)
     // Check for collision
-    collision_evt := collision(state)
-
-    if collision_evt.kind == .Wall && collision_evt.side == .South {
-        return false
+    paddle_side := collision_ball_paddle() 
+    switch paddle_side {
+    case .North, .South:
+        ball_vel.y = -ball_vel.y
+    case .West, .East:
+        ball_vel.x = -ball_vel.x
+    case .None:
+        fallthrough 
     }
-    
-    if collision_evt.kind != .None {
-        fmt.println(collision_evt)
-        switch collision_evt.side {
-            case .North, .South:
-                state.ball.velocity.y = -state.ball.velocity.y
-            case .West, .East:
-                state.ball.velocity.x = -state.ball.velocity.x
-        }
 
-    }
+    wall_side := collision_ball_wall()
+    switch wall_side {
+    case .North, .South:
+        ball_vel.y = -ball_vel.y
+    case .West, .East:
+        ball_vel.x = -ball_vel.x
+    case .None:
+        fallthrough
+    }   
+
     // time-step
-    state.ball.position += state.ball.velocity*dt
-    return true
-
+    ball_pos += ball_vel*dt
+    
+    paddle_pos += paddle_vel*dt
 }
 
 
@@ -139,8 +105,25 @@ draw :: proc() {
     rl.BeginDrawing()
     defer rl.EndDrawing()
 
+
+
     rl.ClearBackground(rl.RAYWHITE)
-    rl.DrawText("Congrats!", 500, 500, 20, rl.LIGHTGRAY)    
+
+    rl.DrawRectangle(
+        i32(ball_pos.x), 
+        i32(ball_pos.y),
+        i32(ball_size.x),
+        i32(ball_size.y),
+        rl.RED
+    )
+
+    rl.DrawRectangle(
+        i32(paddle_pos.x), 
+        i32(paddle_pos.y),
+        i32(paddle_size.x),
+        i32(paddle_size.y),
+        rl.GREEN
+    )  
 }
 
 main :: proc() {
@@ -148,45 +131,28 @@ main :: proc() {
 	defer rl.CloseWindow() 
     rl.SetTargetFPS(FRAME_RATE)
 
-    state := init_game_state()
+    init_game_state()
 
     cnt := 0 
 
     for !rl.WindowShouldClose() {
 
+        // We make sure to move if we've pressed the key this frame
+		if rl.IsKeyPressed(.LEFT) {
+            paddle_vel.x = -100.0
+		}
+
+        if rl.IsKeyPressed(.RIGHT) {
+            paddle_vel.x = +100
+        }
         // update game state
         
-        ok := update(&state)
-
-        if !ok {
-            time.sleep(time.Second)
-            fmt.println("Closing...")
-            break
-        }
-
+        update()
 
         time.sleep(16 * time.Millisecond)
 
         draw()
-        rl.DrawRectangle(
-            i32(state.ball.position.x), 
-            i32(state.ball.position.y),
-            i32(state.ball.width),
-            i32(state.ball.height),
-            rl.RED
-        )
 
-        rl.DrawRectangle(
-            i32(state.paddle.position.x), 
-            i32(state.paddle.position.y),
-            i32(state.paddle.width),
-            i32(state.paddle.height),
-            rl.GREEN
-        )
-        cnt += 1
-        fmt.println(cnt)
     }
 
-    fmt.println(state.paddle)
-    //run_game()
 }
