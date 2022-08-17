@@ -139,11 +139,11 @@ main :: proc() {
 
         // We make sure to move if we've pressed the key this frame
 		if rl.IsKeyPressed(.LEFT) {
-            paddle_vel.x = -100.0
+            paddle_pos.x -= 1.0
 		}
 
         if rl.IsKeyPressed(.RIGHT) {
-            paddle_vel.x = +100
+            paddle_pos.x += 1.0
         }
         // update game state
         
