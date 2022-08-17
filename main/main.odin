@@ -8,6 +8,8 @@ import rl "vendor:raylib"
 SCREEN_WIDTH  :: 850
 SCREEN_HEIGHT :: 650
 FRAME_RATE    :: 60
+PADDLE_SPEED  :: 100
+BALL_SPEED    :: 150 
 
 dt: f32 = 1.0 / FRAME_RATE
 
@@ -29,11 +31,17 @@ Collision :: enum u8 {
 
 
 collision_ball_paddle :: proc() -> Collision {
-    if ball_pos.y + ball_size.y > paddle_pos.y && ball_vel.y > 0 {
+    if ball_pos.y < paddle_pos.y && ball_pos.y + ball_size.y > paddle_pos.y && ball_vel.y > 0 {
         if paddle_pos.x <= ball_pos.x + ball_size.x && ball_pos.x <= paddle_pos.x + paddle_size.x {
             return .North
         }
     }    
+
+    if ball_pos.y > paddle_pos.y && paddle_pos.y + paddle_size.y > ball_pos.y && ball_vel.y < 0 {
+        if paddle_pos.x <= ball_pos.x + ball_size.x && ball_pos.x <= paddle_pos.x + paddle_size.x {
+            return .South
+        }
+    }  
     return .None
 }
 
@@ -61,23 +69,23 @@ collision_ball_wall :: proc() -> Collision {
 init_game_state :: proc() {
 
     ball_pos  = {0.5*SCREEN_WIDTH, 0.5*SCREEN_HEIGHT}
-    ball_vel  = {0, 100.0}
+    ball_vel  = {0, BALL_SPEED}
     ball_size = {10.0, 10.0}
 
-    paddle_pos  = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-100}
+    paddle_pos  = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-200}
     paddle_vel  = {0.0, 0.0}
-    paddle_size = {60, 40}
+    paddle_size = {60, 10}
 
 }
 
 update :: proc() {
 
-    //fmt.println(state.ball)
-    // Check for collision
+
     paddle_side := collision_ball_paddle() 
     switch paddle_side {
     case .North, .South:
         ball_vel.y = -ball_vel.y
+        ball_vel.x = +ball_vel.x + 0.5*paddle_vel.x
     case .West, .East:
         ball_vel.x = -ball_vel.x
     case .None:
@@ -138,13 +146,18 @@ main :: proc() {
     for !rl.WindowShouldClose() {
 
         // We make sure to move if we've pressed the key this frame
-		if rl.IsKeyPressed(.LEFT) {
-            paddle_pos.x -= 1.0
+		if rl.IsKeyDown(.LEFT) {
+            paddle_vel.x = -PADDLE_SPEED
 		}
 
-        if rl.IsKeyPressed(.RIGHT) {
-            paddle_pos.x += 1.0
+        if rl.IsKeyDown(.RIGHT) {
+            paddle_vel.x = +PADDLE_SPEED
         }
+
+        if rl.IsKeyReleased(.LEFT) || rl.IsKeyReleased(.RIGHT) {
+            paddle_vel.x = 0
+            paddle_vel.y = 0
+        } 
         // update game state
         
         update()
