@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import "core:time"
 import rl "vendor:raylib"
+import libc "core:c/libc"
 
 SCREEN_WIDTH     :: 850
 SCREEN_HEIGHT    :: 650
@@ -113,9 +114,9 @@ init_game_state :: proc() {
     paddle_vel  = {0.0, 0.0}
     paddle_size = {60, 10}
 
-    bricks_pos     = {{100, 100}, {130, 100}, {160, 100}}
-    bricks_size    = {{30, 20}, {30, 20}, {30, 20}}
-    bricks_visible = {true, true, true} 
+    bricks_pos     = {0={100, 100}, 1={130, 100}, 2={160, 100}}
+    bricks_size    = {0={30, 20}, 1={30, 20}, 2={30, 20}}
+    bricks_visible = {0=true, 1=true, 2=true} 
 }
 
 update :: proc() {
@@ -235,6 +236,14 @@ main :: proc() {
     }
 
     tmp: [64]u8 
-    a := fmt.bprintf(tmp[:], "Score %d", 10)
-    fmt.println(a)
+    //a := fmt.bprintf(tmp[:], "Score %d", 10)
+
+    //c : [64]libc.char = {0 = 'a', 5 ='b'}
+
+    //b : [^]libc.char = c[:]
+    //b := ([^]libc.char)(&c) // raw_data: converts to a multipointer
+    //libc.printf(cstring(b))
+    //fmt.println(a)
+
+    //b: cstring = "Hello there"
 }
