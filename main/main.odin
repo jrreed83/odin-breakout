@@ -21,6 +21,10 @@ paddle_pos:  [2]f32
 paddle_vel:  [2]f32
 paddle_size: [2]f32 
 
+bricks_pos:     [3][2]f32 
+bricks_size:    [3][2]f32 
+bricks_visible: [3]   bool
+
 Collision :: enum u8 {
     North, 
     East, 
@@ -31,6 +35,7 @@ Collision :: enum u8 {
 
 
 collision_ball_paddle :: proc() -> Collision {
+
     if ball_pos.y < paddle_pos.y && ball_pos.y + ball_size.y > paddle_pos.y && ball_vel.y > 0 {
         if paddle_pos.x <= ball_pos.x + ball_size.x && ball_pos.x <= paddle_pos.x + paddle_size.x {
             return .North
@@ -43,6 +48,30 @@ collision_ball_paddle :: proc() -> Collision {
         }
     }  
     return .None
+}
+
+collision_ball_bricks :: proc() -> (Collision, int) {
+    for i in 0..<len(bricks_pos) {
+        if ball_pos.y < bricks_pos[i].y && ball_pos.y + ball_size.y > bricks_pos[i].y && ball_vel.y > 0 {
+            if bricks_pos[i].x <= ball_pos.x + ball_size.x && ball_pos.x <= bricks_pos[i].x + bricks_size[i].x {
+                return .North, i
+            }
+        }    
+
+        if ball_pos.y > bricks_pos[i].y && bricks_pos[i].y + bricks_size[i].y > ball_pos.y && ball_vel.y < 0 {
+            if bricks_pos[i].x <= ball_pos.x + ball_size.x && ball_pos.x <= bricks_pos[i].x + bricks_size[i].x {
+                return .South, i
+            }
+        }
+        
+        if ball_pos.x < bricks_pos[i].x && ball_pos.x + ball_size.x > bricks_pos[i].x && ball_vel.x > 0 {
+            if bricks_pos[i].y <= ball_pos.y + ball_size.y && ball_pos.y <= bricks_pos[i].y + bricks_size[i].y {
+                return .West, i
+            }
+        }
+
+    }  
+    return .None, -1
 }
 
 collision_ball_wall :: proc() -> Collision {
@@ -76,9 +105,25 @@ init_game_state :: proc() {
     paddle_vel  = {0.0, 0.0}
     paddle_size = {60, 10}
 
+    bricks_pos     = {{100, 100}, {300, 100}, {400, 100}}
+    bricks_size    = {{50, 50}, {50, 50}, {50, 50}}
+    bricks_visible = {true, true, true} 
 }
 
 update :: proc() {
+
+    brick_side, index := collision_ball_bricks()
+    if index >= 0 {
+        bricks_visible[index] = false
+    }
+    switch brick_side {
+    case .North, .South:
+        ball_vel.y = -ball_vel.y
+    case .West, .East:
+        ball_vel.x = -ball_vel.x
+    case .None:
+        fallthrough
+    } 
 
     // Make sure paddle stays in region
 
@@ -116,8 +161,6 @@ draw :: proc() {
     rl.BeginDrawing()
     defer rl.EndDrawing()
 
-
-
     rl.ClearBackground(rl.RAYWHITE)
 
     rl.DrawRectangle(
@@ -135,12 +178,23 @@ draw :: proc() {
         i32(paddle_size.y),
         rl.GREEN
     )  
+
+    for i in 0..<len(bricks_pos) {
+        if bricks_visible[i] {
+            rl.DrawRectangle(
+                i32(bricks_pos[i].x), 
+                i32(bricks_pos[i].y),
+                i32(bricks_size[i].x),
+                i32(bricks_size[i].y),
+                rl.GREEN
+            )
+        }  
+    }
 }
 
 main :: proc() {
 	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
 	defer rl.CloseWindow() 
-    rl.SetTargetFPS(FRAME_RATE)
 
     init_game_state()
 
