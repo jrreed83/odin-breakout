@@ -80,6 +80,7 @@ init_game_state :: proc() {
 
 update :: proc() {
 
+    // Make sure paddle stays in region
 
     paddle_side := collision_ball_paddle() 
     switch paddle_side {
@@ -104,9 +105,11 @@ update :: proc() {
 
     // time-step
     ball_pos += ball_vel*dt
-    
-    paddle_pos += paddle_vel*dt
-}
+
+    paddle_pos.x += paddle_vel.x*dt
+    paddle_pos.x = paddle_pos.x < 0 ? 0 : paddle_pos.x
+    paddle_pos.x = paddle_pos.x + paddle_size.x > SCREEN_WIDTH ? SCREEN_WIDTH - paddle_size.x: paddle_pos.x
+}   
 
 
 draw :: proc() {
