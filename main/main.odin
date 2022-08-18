@@ -6,6 +6,7 @@ import      "core:time"
 import rl   "vendor:raylib"
 import libc "core:c/libc"
 
+
 SCREEN_WIDTH     :: 850
 SCREEN_HEIGHT    :: 650
 
@@ -57,7 +58,7 @@ init_game_state :: proc() {
         for j in 0..<10 {
             bricks[idx] = {
                 pos     = {f32(100+50*j), f32(100+30*i)},
-                size    = {50, 30},
+                size    = {45, 25},
                 visible = true,
                 color   = ROW_COLORS[i]
             }
@@ -165,6 +166,7 @@ update :: proc() {
 
 
 draw :: proc() {
+    
     rl.BeginDrawing()
     defer rl.EndDrawing()
 
@@ -212,18 +214,15 @@ main :: proc() {
 
         // We make sure to move if we've pressed the key this frame
 		if rl.IsKeyDown(.LEFT) {
-            //event = .MOVE_LEFT
             paddle.vel.x = -PADDLE_SPEED
 		}
 
         if rl.IsKeyDown(.RIGHT) {
-            //event = .MOVE_RIGHT
             paddle.vel.x = +PADDLE_SPEED
         }
 
         if rl.IsKeyReleased(.LEFT) || rl.IsKeyReleased(.RIGHT) {
-            paddle.vel.x = 0
-            paddle.vel.y = 0
+            paddle.vel = {0.0, 0.0}
         } 
         // update game state
         
@@ -238,18 +237,18 @@ main :: proc() {
     tmp: [64]u8 
     //a := fmt.bprintf(tmp[:], "Score %d", 10)
 
-    //c : [64]libc.char = {0 = 'a', 5 ='b'}
+    c : [64]libc.char = {0 = 'a', 5 ='b'}
 
     //b : [^]libc.char = c[:]
-    //b := ([^]libc.char)(&c) // raw_data: converts to a multipointer
+    b := ([^]libc.char)(&c[0]) // raw_data: converts to a multipointer
     //libc.printf(cstring(b))
     //fmt.println(a)
 
     //b: cstring = "Hello there"
 
-    a: [2]f32 = {1.0, 5.3}
-    b: [2]f32 = {2.1, 4.7}
+    foo : [64]libc.char = {0=' '}
+    bar := ([^]libc.char)(&foo[0])
+    libc.printf(cstring(bar))
 
-    fmt.println(a+b)
 
 }
