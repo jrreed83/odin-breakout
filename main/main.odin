@@ -9,15 +9,16 @@ import libc "core:c/libc"
 
 SCREEN_WIDTH     :: 850
 SCREEN_HEIGHT    :: 650
-
 FRAME_RATE       :: 60
+SAMPLE_RATE      :: 60
 PADDLE_SPEED     :: 100
 BALL_SPEED       :: 300
 BACKGROUND_COLOR :: rl.BLACK 
 PADDLE_COLOR     :: rl.RED
 BALL_COLOR       :: rl.RED
 
-dt: f32 = 1.0 / FRAME_RATE
+#assert(SCREEN_WIDTH == 850)
+dt: f32 = 1.0 / SAMPLE_RATE
 
 score:= 0
 
