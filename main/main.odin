@@ -14,43 +14,49 @@ SAMPLE_RATE      :: 60
 PADDLE_SPEED     :: 100
 BALL_SPEED       :: 300
 BACKGROUND_COLOR :: rl.BLACK 
+
 PADDLE_COLOR     :: rl.RED
+PADDLE_WIDTH     :: 60  
+PADDLE_HEIGHT    :: 20 
+
 BALL_COLOR       :: rl.RED
+BALL_WIDTH       :: 10 
+BALL_HEIGHT      :: 10 
 
 #assert(SCREEN_WIDTH == 850)
 dt: f32 = 1.0 / SAMPLE_RATE
 
 score:= 0
 
-Entity :: struct {
-    pos:     [2]f32     ,
-    size:    [2]f32     ,
-    vel:     [2]f32     ,
-    acc:     [2]f32     ,
-    mass:       f32     ,
-    visible:    bool    ,
-    color:      rl.Color 
+Thing :: struct {
+    pos:     [2] f32     ,
+    size:    [2] f32     ,
+    vel:     [2] f32     ,
+    acc:     [2] f32     ,
+    mass:        f32     ,
+    visible:     bool    ,
+    color:       rl.Color 
 }
 
-ball   :     Entity 
-paddle :     Entity
-bricks : [60]Entity
+ball   :      Thing 
+paddle :      Thing
+bricks : [60] Thing
 
-ROW_COLORS : [6]rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
+ROW_COLORS : [6] rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
 
-init_game_state :: proc() {
+setup_game :: proc() {
 
     ball = {
         pos   = {0.5*SCREEN_WIDTH, 0.5*SCREEN_HEIGHT},
         vel   = {0, BALL_SPEED},
-        size  = {10, 10},
+        size  = {BALL_WIDTH, BALL_HEIGHT},
         color = BALL_COLOR
     }
 
     paddle = {
         pos   = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-200},
         vel   = {0.0, 0.0},
-        size  = {60, 10},
+        size  = {PADDLE_WIDTH, PADDLE_HEIGHT},
         color = PADDLE_COLOR
     }
 
@@ -68,7 +74,7 @@ init_game_state :: proc() {
     }
 }
 
-update :: proc() {
+update_game :: proc() {
 
     // Update dynamics
     ball.pos   += dt * ball.vel 
@@ -166,7 +172,7 @@ update :: proc() {
 }   
 
 
-draw :: proc() {
+draw_game :: proc() {
     
     rl.BeginDrawing()
     defer rl.EndDrawing()
@@ -174,6 +180,7 @@ draw :: proc() {
     rl.ClearBackground(BACKGROUND_COLOR)
 
     rl.DrawText(rl.TextFormat("Score: %d", score), 40, 40, 20, rl.WHITE)
+
     rl.DrawRectangle(
         i32(ball.pos.x), 
         i32(ball.pos.y),
@@ -207,7 +214,7 @@ main :: proc() {
 	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
 	defer rl.CloseWindow() 
 
-    init_game_state()
+    setup_game()
 
     cnt := 0 
 
@@ -227,11 +234,11 @@ main :: proc() {
         } 
         // update game state
         
-        update()
+        update_game()
 
         time.sleep(16 * time.Millisecond)
 
-        draw()
+        draw_game()
 
     }
 
