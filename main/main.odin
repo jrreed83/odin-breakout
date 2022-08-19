@@ -37,7 +37,7 @@ GRID_PADDING_X :: 0.5*(SCREEN_WIDTH - BRICK_WIDTH * GRID_NUM_COLS - BRICK_SPACIN
 
 dt: f32 = 1.0 / SAMPLE_RATE
 
-friction :f32 = 4.0 
+friction :f32 = 1.0 
 
 score:= 0
 
@@ -56,6 +56,8 @@ paddle : Thing
 bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Thing
 
 ROW_COLORS : [6] rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
+
+square :: proc(x: f32) -> f32 { return x * x }
 
 setup_game :: proc() {
 
@@ -87,16 +89,27 @@ setup_game :: proc() {
     }
 }
 
+update_score :: proc(color: rl.Color) {
+    switch color {
+    case rl.BLUE:   score += 1
+    case rl.GREEN:  score += 2
+    case rl.YELLOW: score += 3
+    case rl.ORANGE: score += 4
+    case rl.PINK:   score += 5
+    case :          fallthrough  
+    }
+}
+
 update_game :: proc() {
 
     // Update dynamics
-    ball.pos   += dt * ball.vel 
+    ball.pos = ball.pos + ball.vel*dt 
 
-    // Frictional Force
-    paddle.acc += -friction*paddle.vel
-
-    paddle.pos = paddle.pos + dt * paddle.vel + 0.5*paddle.acc*(dt*dt)
-    paddle.vel = paddle.vel + dt * paddle.acc     
+    // semi-implicit Euler with drag
+    paddle.acc = paddle.acc -friction*paddle.vel
+    paddle.vel = paddle.vel + paddle.acc * dt
+    paddle.pos = paddle.pos + paddle.vel * dt + 0.5*paddle.acc*square(dt)
+    
 
 
     // Deal with paddle going to boundary
@@ -136,19 +149,14 @@ update_game :: proc() {
         for j in 0..<GRID_NUM_COLS {
             brick := bricks[i][j]
             if brick.visible {
-
+                
                 if ball.pos.y < brick.pos.y && ball.pos.y + ball.size.y > brick.pos.y && ball.vel.y > 0 {
                     if brick.pos.x <= ball.pos.x + ball.size.x && ball.pos.x <= brick.pos.x + brick.size.x {
                         ball.vel.y = -ball.vel.y
                         bricks[i][j].visible = false
                     
-                        switch brick.color {
-                        case rl.BLUE:   score += 1
-                        case rl.GREEN:  score += 2
-                        case rl.YELLOW: score += 3
-                        case rl.ORANGE: score += 4
-                        case rl.PINK:   score += 5
-                        }
+                        update_score(brick.color)
+
 
                         break
                     }
@@ -158,13 +166,7 @@ update_game :: proc() {
                     if brick.pos.x <= ball.pos.x + ball.size.x && ball.pos.x <= brick.pos.x + brick.size.x {
                         ball.vel.y = -ball.vel.y
                         bricks[i][j].visible = false
-                        switch brick.color {
-                        case rl.BLUE:   score += 1
-                        case rl.GREEN:  score += 2
-                        case rl.YELLOW: score += 3
-                        case rl.ORANGE: score += 4
-                        case rl.PINK:   score += 5
-                        }
+                        update_score(brick.color)
                     
                         break
                     }
@@ -174,13 +176,7 @@ update_game :: proc() {
                     if brick.pos.y <= ball.pos.y + ball.size.y && ball.pos.y <= brick.pos.y + brick.size.y {
                         ball.vel.x = -ball.vel.x 
                         bricks[i][j].visible = false
-                        switch brick.color {
-                        case rl.BLUE:   score += 1
-                        case rl.GREEN:  score += 2
-                        case rl.YELLOW: score += 3
-                        case rl.ORANGE: score += 4
-                        case rl.PINK:   score += 5
-                        }
+                        update_score(brick.color)
                     
                         break
                     }
@@ -248,11 +244,11 @@ main :: proc() {
 
         // We make sure to move if we've pressed the key this frame
 		if rl.IsKeyDown(.LEFT) {
-            paddle.acc.x = -300
+            paddle.acc.x = -500
 		}
 
         if rl.IsKeyDown(.RIGHT) {
-            paddle.acc.x = +300
+            paddle.acc.x = +500
         }
         
         update_game()
@@ -278,6 +274,5 @@ main :: proc() {
     foo : [64]libc.char = {0=' '}
     bar := ([^]libc.char)(&foo[0])
     libc.printf(cstring(bar))
-
 
 }
