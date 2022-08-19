@@ -11,36 +11,47 @@ SCREEN_WIDTH     :: 850
 SCREEN_HEIGHT    :: 650
 FRAME_RATE       :: 60
 SAMPLE_RATE      :: 60
-PADDLE_SPEED     :: 100
-BALL_SPEED       :: 300
+
 BACKGROUND_COLOR :: rl.BLACK 
 
 PADDLE_COLOR     :: rl.RED
 PADDLE_WIDTH     :: 60  
 PADDLE_HEIGHT    :: 20 
+PADDLE_SPEED     :: 100
 
 BALL_COLOR       :: rl.RED
 BALL_WIDTH       :: 10 
 BALL_HEIGHT      :: 10 
+BALL_SPEED       :: 300
+
+BRICK_HEIGHT   :: 25
+BRICK_WIDTH    :: 45 
+
+GRID_NUM_ROWS  :: 6 
+GRID_NUM_COLS  :: 10 
+BRICK_SPACING  :: 10
+GRID_PADDING_Y :: 50
+GRID_PADDING_X :: 0.5*(SCREEN_WIDTH - BRICK_WIDTH * GRID_NUM_COLS - BRICK_SPACING * (GRID_NUM_COLS-1))
 
 #assert(SCREEN_WIDTH == 850)
+
 dt: f32 = 1.0 / SAMPLE_RATE
 
 score:= 0
 
 Thing :: struct {
-    pos:     [2] f32     ,
-    size:    [2] f32     ,
-    vel:     [2] f32     ,
-    acc:     [2] f32     ,
-    mass:        f32     ,
-    visible:     bool    ,
+    pos:     [2] f32,
+    size:    [2] f32,
+    vel:     [2] f32,
+    acc:     [2] f32,
+    mass:        f32,
+    visible:     bool,
     color:       rl.Color 
 }
 
-ball   :      Thing 
-paddle :      Thing
-bricks : [60] Thing
+ball   : Thing 
+paddle : Thing
+bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Thing
 
 ROW_COLORS : [6] rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
 
@@ -54,18 +65,18 @@ setup_game :: proc() {
     }
 
     paddle = {
-        pos   = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-200},
+        pos   = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-100},
         vel   = {0.0, 0.0},
         size  = {PADDLE_WIDTH, PADDLE_HEIGHT},
         color = PADDLE_COLOR
     }
 
     idx := 0
-    for i in 0..<6 {
-        for j in 0..<10 {
-            bricks[idx] = {
-                pos     = {f32(100+50*j), f32(100+30*i)},
-                size    = {45, 25},
+    for i in 0..<GRID_NUM_ROWS {
+        for j in 0..<GRID_NUM_COLS {
+            bricks[i][j] = {
+                pos     = {f32(GRID_PADDING_X+(BRICK_WIDTH+BRICK_SPACING)*j), f32(GRID_PADDING_Y+(BRICK_HEIGHT+BRICK_SPACING)*i)},
+                size    = {BRICK_WIDTH, BRICK_HEIGHT},
                 visible = true,
                 color   = ROW_COLORS[i]
             }
@@ -113,62 +124,63 @@ update_game :: proc() {
 
     // Check for brick collistion
 
-    for brick, i in bricks {
-        if brick.visible {
+    for i in 0..<GRID_NUM_ROWS {
+        for j in 0..<GRID_NUM_COLS {
+            brick := bricks[i][j]
+            if brick.visible {
 
-            if ball.pos.y < brick.pos.y && ball.pos.y + ball.size.y > brick.pos.y && ball.vel.y > 0 {
-                if brick.pos.x <= ball.pos.x + ball.size.x && ball.pos.x <= brick.pos.x + brick.size.x {
-                    ball.vel.y = -ball.vel.y
-                    bricks[i].visible = false
+                if ball.pos.y < brick.pos.y && ball.pos.y + ball.size.y > brick.pos.y && ball.vel.y > 0 {
+                    if brick.pos.x <= ball.pos.x + ball.size.x && ball.pos.x <= brick.pos.x + brick.size.x {
+                        ball.vel.y = -ball.vel.y
+                        bricks[i][j].visible = false
                     
-                    switch brick.color {
-                    case rl.BLUE:   score += 1
-                    case rl.GREEN:  score += 2
-                    case rl.YELLOW: score += 3
-                    case rl.ORANGE: score += 4
-                    case rl.PINK:   score += 5
-                    }
+                        switch brick.color {
+                        case rl.BLUE:   score += 1
+                        case rl.GREEN:  score += 2
+                        case rl.YELLOW: score += 3
+                        case rl.ORANGE: score += 4
+                        case rl.PINK:   score += 5
+                        }
 
-                    break
-                }
-            }    
-
-            if ball.pos.y > brick.pos.y && brick.pos.y + brick.size.y > ball.pos.y && ball.vel.y < 0 {
-                if brick.pos.x <= ball.pos.x + ball.size.x && ball.pos.x <= brick.pos.x + brick.size.x {
-                    ball.vel.y = -ball.vel.y
-                    bricks[i].visible = false
-                    switch brick.color {
-                    case rl.BLUE:   score += 1
-                    case rl.GREEN:  score += 2
-                    case rl.YELLOW: score += 3
-                    case rl.ORANGE: score += 4
-                    case rl.PINK:   score += 5
+                        break
                     }
+                }    
+
+                if ball.pos.y > brick.pos.y && brick.pos.y + brick.size.y > ball.pos.y && ball.vel.y < 0 {
+                    if brick.pos.x <= ball.pos.x + ball.size.x && ball.pos.x <= brick.pos.x + brick.size.x {
+                        ball.vel.y = -ball.vel.y
+                        bricks[i][j].visible = false
+                        switch brick.color {
+                        case rl.BLUE:   score += 1
+                        case rl.GREEN:  score += 2
+                        case rl.YELLOW: score += 3
+                        case rl.ORANGE: score += 4
+                        case rl.PINK:   score += 5
+                        }
                     
-                    break
+                        break
+                    }
                 }
-            }
             
-            if ball.pos.x < brick.pos.x && ball.pos.x + ball.size.x > brick.pos.x && ball.vel.x > 0 {
-                if brick.pos.y <= ball.pos.y + ball.size.y && ball.pos.y <= brick.pos.y + brick.size.y {
-                    ball.vel.x = -ball.vel.x 
-                    bricks[i].visible = false
-                    switch brick.color {
-                    case rl.BLUE:   score += 1
-                    case rl.GREEN:  score += 2
-                    case rl.YELLOW: score += 3
-                    case rl.ORANGE: score += 4
-                    case rl.PINK:   score += 5
-                    }
+                if ball.pos.x < brick.pos.x && ball.pos.x + ball.size.x > brick.pos.x && ball.vel.x > 0 {
+                    if brick.pos.y <= ball.pos.y + ball.size.y && ball.pos.y <= brick.pos.y + brick.size.y {
+                        ball.vel.x = -ball.vel.x 
+                        bricks[i][j].visible = false
+                        switch brick.color {
+                        case rl.BLUE:   score += 1
+                        case rl.GREEN:  score += 2
+                        case rl.YELLOW: score += 3
+                        case rl.ORANGE: score += 4
+                        case rl.PINK:   score += 5
+                        }
                     
-                    break
+                        break
+                    }
                 }
             }
-
-            // NEED AN ADDITIONAL ONE
         }
+    }
 
-    }  
 }   
 
 
@@ -197,16 +209,19 @@ draw_game :: proc() {
         paddle.color
     )  
 
-    for brick in bricks {
-        if brick.visible {
-            rl.DrawRectangle(
-                i32(brick.pos.x), 
-                i32(brick.pos.y),
-                i32(brick.size.x),
-                i32(brick.size.y),
-                brick.color
-            )
-        }  
+    for i in 0..<GRID_NUM_ROWS {
+        for j in 0..<GRID_NUM_COLS {
+            brick := bricks[i][j]
+            if brick.visible {
+                rl.DrawRectangle(
+                    i32(brick.pos.x), 
+                    i32(brick.pos.y),
+                    i32(brick.size.x),
+                    i32(brick.size.y),
+                    brick.color
+                )
+            }      
+        }
     }
 }
 
