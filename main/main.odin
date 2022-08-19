@@ -106,7 +106,7 @@ update_game :: proc() {
     ball.pos = ball.pos + ball.vel*dt 
 
     // semi-implicit Euler with drag
-    paddle.acc = paddle.acc -friction*paddle.vel
+    paddle.acc = paddle.acc - 5*paddle.vel
     paddle.vel = paddle.vel + paddle.acc * dt
     paddle.pos = paddle.pos + paddle.vel * dt + 0.5*paddle.acc*square(dt)
     
@@ -244,11 +244,11 @@ main :: proc() {
 
         // We make sure to move if we've pressed the key this frame
 		if rl.IsKeyDown(.LEFT) {
-            paddle.acc.x = -500
+            paddle.acc.x = -1000
 		}
 
         if rl.IsKeyDown(.RIGHT) {
-            paddle.acc.x = +500
+            paddle.acc.x = +1000
         }
         
         update_game()
