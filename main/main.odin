@@ -37,6 +37,8 @@ GRID_PADDING_X :: 0.5*(SCREEN_WIDTH - BRICK_WIDTH * GRID_NUM_COLS - BRICK_SPACIN
 
 dt: f32 = 1.0 / SAMPLE_RATE
 
+friction :f32 = 4.0 
+
 score:= 0
 
 Thing :: struct {
@@ -89,7 +91,13 @@ update_game :: proc() {
 
     // Update dynamics
     ball.pos   += dt * ball.vel 
-    paddle.pos += dt * paddle.vel
+
+    // Frictional Force
+    paddle.acc += -friction*paddle.vel
+
+    paddle.pos = paddle.pos + dt * paddle.vel + 0.5*paddle.acc*(dt*dt)
+    paddle.vel = paddle.vel + dt * paddle.acc     
+
 
     // Deal with paddle going to boundary
     paddle.pos.x = paddle.pos.x < 0 ? 0 : paddle.pos.x
@@ -235,19 +243,17 @@ main :: proc() {
 
     for !rl.WindowShouldClose() {
 
+
+        paddle.acc = {0,0}
+
         // We make sure to move if we've pressed the key this frame
 		if rl.IsKeyDown(.LEFT) {
-            paddle.vel.x = -PADDLE_SPEED
+            paddle.acc.x = -300
 		}
 
         if rl.IsKeyDown(.RIGHT) {
-            paddle.vel.x = +PADDLE_SPEED
+            paddle.acc.x = +300
         }
-
-        if rl.IsKeyReleased(.LEFT) || rl.IsKeyReleased(.RIGHT) {
-            paddle.vel = {0.0, 0.0}
-        } 
-        // update game state
         
         update_game()
 
