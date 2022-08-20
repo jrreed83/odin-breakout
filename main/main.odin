@@ -28,9 +28,9 @@ PADDLE_SPEED     :: 100
 
 BALL_COLOR       :: rl.WHITE
 BALL_RADIUS      :: 5
-BALL_MIN_X       :: PADDLE_MIN_X - 50 //PADDLE_CENTER_X - BALL_RADIUS 
+BALL_MIN_X       :: PADDLE_CENTER_X - BALL_RADIUS -5
 BALL_MAX_X       :: BALL_MIN_X + 2*BALL_RADIUS 
-BALL_MIN_Y       :: PADDLE_MIN_Y //PADDLE_MIN_Y - 10*BALL_RADIUS 
+BALL_MIN_Y       :: PADDLE_MIN_Y - 10*BALL_RADIUS 
 BALL_MAX_Y       :: BALL_MIN_Y + 2*BALL_RADIUS
 
 BALL_SPEED       :: 300
@@ -198,13 +198,53 @@ update_game :: proc () {
         case 0, 1: ball.velocity.y = -ball.velocity.y
         case 2, 3: ball.velocity.x = -ball.velocity.x
         }
-
-        // Adjust the physics as necesaary
-//        if ball.velocity.y > 0 || ball.velocity.y < 0 {
-//            ball.velocity.y = -ball.velocity.y                 
-//        }
     }
     // 3. Check to see if ball has collided with any targets 
+    for i in 0..<GRID_NUM_ROWS {
+        for j in 0..<GRID_NUM_COLS {
+
+            brick := bricks[i][j]
+
+            if brick.visible {
+                min_x, max_x := brick.min.x - r.x, brick.max.x + r.x 
+                min_y, max_y := brick.min.y - r.y, brick.max.y + r.y 
+                if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
+                    d : [4]f32
+
+                    // Determine where the ball hits the brick
+                    // 1. top edge ...
+                    d[0] = c.y - min_y 
+        
+                    // 2. bottom edge ...
+                    d[1] = max_y - c.y 
+
+                    // 3. left edge ...
+                    d[2] = c.x - min_x 
+
+                    // 4. right edge ...
+                    d[3] = max_x - c.x 
+
+                    index: int = 0 
+                    smallest:= d[0]
+                    for di, i in d {
+                        if di < smallest {
+                            smallest = di 
+                            index    = i
+                        }
+                    }
+
+                    // TODO: what about corner collision?
+                    fmt.println(d, index)
+                    switch index {
+                    case 0, 1: ball.velocity.y = -ball.velocity.y
+                    case 2, 3: ball.velocity.x = -ball.velocity.x
+                    }
+
+                    bricks[i][j].visible = false
+                }
+            }
+        }
+    }
 
     // 4. Check to see if ball has collided with wall
 
@@ -218,7 +258,7 @@ setup_game :: proc() {
         box        = {min={BALL_MIN_X, BALL_MIN_Y}, max={BALL_MAX_X, BALL_MAX_Y}},
         shape_type = .Circle,
         color      = BALL_COLOR,
-        velocity   = {+10, +0.0}
+        velocity   = {0, 20.0}
     }
 
     paddle = {
