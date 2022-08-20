@@ -20,8 +20,7 @@ PADDLE_HEIGHT    :: 20
 PADDLE_SPEED     :: 100
 
 BALL_COLOR       :: rl.RED
-BALL_WIDTH       :: 10 
-BALL_HEIGHT      :: 10 
+BALL_RADIUS      :: 10 
 BALL_SPEED       :: 300
 
 BRICK_HEIGHT   :: 25
@@ -41,32 +40,156 @@ friction :f32 = 1.0
 
 score:= 0
 
-Thing :: struct {
-    pos:     [2] f32,
-    size:    [2] f32,
-    vel:     [2] f32,
-    acc:     [2] f32,
-    mass:        f32,
-    visible:     bool,
-    color:       rl.Color 
+Rectangle :: struct {
+    min: [2] f32,  // upper left visually
+    max: [2] f32   // lower right visually
+}
+
+Circle :: struct {
+    center: [2] f32,
+    radius:     f32
 }
 
 Projectile :: struct {
-    
+    using shape: Circle,
+
+    velocity:     [2] f32,
+    acceleration: [2] f32,
+    mass:             f32,
+    color:            rl.Color
 }
-ball   : Thing 
-paddle : Thing
-bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Thing
+
+Brick :: struct {
+    using shape: Rectangle,
+
+    velocity:     [2] f32,
+    acceleration: [2] f32,
+    mass:             f32,
+    color:            rl.Color,
+    visible:          bool
+}
+
+Paddle :: struct {
+    using shape: Rectangle,
+
+    velocity:     [2] f32,
+    acceleration: [2] f32,
+    mass:             f32,
+    color:            rl.Color
+}
+
+ball   : Projectile 
+paddle : Paddle
+bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Brick
+
+
+setup_game :: proc() {
+    ball = Projectile {
+        shape = Circle {
+            radius = BALL_RADIUS,
+            center = {0.0,0.0},
+        },
+        velocity = {0.0, 0.0},
+        color    = BALL_COLOR ,
+    }
+
+    paddle = {
+        shape = Rectangle {
+            min = {0.5*SCREEN_WIDTH, SCREEN_HEIGHT-100},
+            max = {0.5*SCREEN_WIDTH + PADDLE_WIDTH, SCREEN_HEIGHT-100 + PADDLE_HEIGHT},
+        },
+        velocity = {0.0, 0.0},
+        color    = PADDLE_COLOR
+    }
+
+    brick_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y}
+    
+    for i in 0..<GRID_NUM_ROWS {
+        brick_min.x = GRID_PADDING_X
+        for j in 0..<GRID_NUM_COLS {
+            bricks[i][j] = {
+                shape = Rectangle {
+                    min = brick_min,
+                    max = brick_min + {BRICK_WIDTH, BRICK_HEIGHT} 
+                }, 
+                color   = ROW_COLORS[i],
+                visible = true
+            }
+            brick_min.x += (BRICK_WIDTH + BRICK_SPACING)
+        }
+        brick_min.y += (BRICK_HEIGHT + BRICK_SPACING)
+    }
+    
+
+}
 
 ROW_COLORS : [6] rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
 
+draw_game :: proc() {
+    
+    rl.BeginDrawing()
+    defer rl.EndDrawing()
+
+    rl.ClearBackground(BACKGROUND_COLOR)
+
+    rl.DrawText(rl.TextFormat("Score: %d", score), 40, 40, 20, rl.WHITE)
+
+    for i in 0..<GRID_NUM_ROWS {
+        for j in 0..<GRID_NUM_COLS {
+            brick := bricks[i][j]
+            if brick.visible {
+                rl.DrawRectangle(
+                    i32(brick.min.x), 
+                    i32(brick.min.y),
+                    i32(brick.max.x-brick.min.x),
+                    i32(brick.max.y-brick.min.y),
+                    brick.color
+                )
+            }      
+        }
+    }
+}
+
+main :: proc() {
+    rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
+    defer rl.CloseWindow() 
+
+    setup_game()
+
+    //cnt := 0 
+
+    for !rl.WindowShouldClose() {
+
+
+//        paddle.acc = {0,0}
+//
+//        // We make sure to move if we've pressed the key this frame
+//        if rl.IsKeyDown(.LEFT) {
+//            paddle.acc.x = -1000
+//        }
+//
+///        if rl.IsKeyDown(.RIGHT) {
+//            paddle.acc.x = +1000
+//        }
+//        
+//        update_game()
+//
+//        time.sleep(16 * time.Millisecond)
+
+        draw_game()
+
+    }
+
+
+}
+/*
 square :: proc(x: f32) -> f32 { return x * x }
 
 setup_game :: proc() {
 
     ball = {
-        pos   = {0.5*SCREEN_WIDTH, 0.5*SCREEN_HEIGHT},
-        vel   = {0, BALL_SPEED},
+        shape = Circle{{}, BALL_RADIUS},
+        velocity   = {0, BALL_SPEED},
         size  = {BALL_WIDTH, BALL_HEIGHT},
         color = BALL_COLOR
     }
@@ -91,6 +214,7 @@ setup_game :: proc() {
         }
     }
 }
+
 
 update_score :: proc(color: rl.Color) {
     switch color {
@@ -262,20 +386,6 @@ main :: proc() {
 
     }
 
-    tmp: [64]u8 
-    //a := fmt.bprintf(tmp[:], "Score %d", 10)
-
-    c : [64]libc.char = {0 = 'a', 5 ='b'}
-
-    //b : [^]libc.char = c[:]
-    b := ([^]libc.char)(&c[0]) // raw_data: converts to a multipointer
-    //libc.printf(cstring(b))
-    //fmt.println(a)
-
-    //b: cstring = "Hello there"
-
-    foo : [64]libc.char = {0=' '}
-    bar := ([^]libc.char)(&foo[0])
-    libc.printf(cstring(bar))
 
 }
+*/
