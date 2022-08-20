@@ -51,6 +51,9 @@ Thing :: struct {
     color:       rl.Color 
 }
 
+Projectile :: struct {
+    
+}
 ball   : Thing 
 paddle : Thing
 bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Thing
