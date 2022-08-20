@@ -18,10 +18,21 @@ BACKGROUND_COLOR :: rl.BLACK
 PADDLE_COLOR     :: rl.RED
 PADDLE_WIDTH     :: 60  
 PADDLE_HEIGHT    :: 20 
+PADDLE_MIN_X     :: 0.5*(SCREEN_WIDTH - PADDLE_WIDTH)    
+PADDLE_MIN_Y     :: 600  
+PADDLE_MAX_X     :: PADDLE_MIN_X + PADDLE_WIDTH 
+PADDLE_MAX_Y     :: PADDLE_MIN_Y + PADDLE_HEIGHT
+PADDLE_CENTER_X  :: 0.5*(PADDLE_MIN_X + PADDLE_MAX_X)
+
 PADDLE_SPEED     :: 100
 
-BALL_COLOR       :: rl.RED
+BALL_COLOR       :: rl.WHITE
 BALL_RADIUS      :: 10 
+BALL_MIN_X       :: PADDLE_CENTER_X - BALL_RADIUS 
+BALL_MAX_X       :: BALL_MIN_X + 2*BALL_RADIUS 
+BALL_MIN_Y       :: PADDLE_MIN_Y - 2.1*BALL_RADIUS 
+BALL_MAX_Y       :: BALL_MIN_Y + 2*BALL_RADIUS
+
 BALL_SPEED       :: 300
 
 BRICK_HEIGHT   :: 25
@@ -61,21 +72,14 @@ bounding_box_radii :: proc (e: Entity) -> [2] f32 {
 }
 
 Entity :: struct {
-    using box:    BoundingBox,
-    shape_type:   ShapeType,
-    velocity:     [2] f32,
-    acceleration: [2] f32,
-    mass:             f32,
-    color:            rl.Color    
+    using box:   BoundingBox,
+    shape_type:  ShapeType,
+    velocity:    [2] f32,
+    mass:            f32,
+    color:           rl.Color,
+    visible:         bool   
 }
 
-circle :: proc(center: [2] f32, radius: f32, color: rl.Color) -> Entity {
-    return Entity {
-        box        = {center-radius, center+radius},
-        shape_type = .Circle,
-        color      = color 
-    }
-}
 
 ball   : Entity  
 paddle : Entity
@@ -125,22 +129,33 @@ collision_location:: proc(ball: Entity, e2: Entity) -> [2] f32 {
     return ---
 }
 
-    using box:    BoundingBox,
-    shape_type:   ShapeType,
-    velocity:     [2] f32,
-    acceleration: [2] f32,
-    mass:             f32,
-    color:            rl.Color    
+update_game :: proc () {
+    ball_acceleration :   [2] f32 = {0,0}
+    paddle_acceleration : [2] f32 = {0,0}
+    
+    ////////////////////////////////////////////////////////////////////////////
+    // User input 
+    if 
+    ////////////////////////////////////////////////////////////////////////////
+    // physics 
+
+    ////////////////////////////////////////////////////////////////////////////
+    // collision detection
+
+    ////////////////////////////////////////////////////////////////////////////
+    // update
+}
+
 
 setup_game :: proc() {
     ball = {
-        box        = {},
+        box        = {min={BALL_MIN_X, BALL_MIN_Y}, max={BALL_MAX_X, BALL_MAX_Y}},
         shape_type = .Circle,
         color      = BALL_COLOR,
     }
 
     paddle = {
-        box        = {min={200, 200}, max={250, 300}},
+        box        = {min={PADDLE_MIN_X, PADDLE_MIN_Y}, max={PADDLE_MAX_X, PADDLE_MAX_Y}},
         shape_type = .Rectangle,
         color      = BALL_COLOR,   
     }
@@ -177,6 +192,23 @@ draw_game :: proc() {
 
     rl.DrawText(rl.TextFormat("Score: %d", score), 40, 40, 20, rl.WHITE)
 
+    center := bounding_box_center(ball)
+    radii  := bounding_box_radii(ball)
+    rl.DrawCircle(
+        i32(center.x), 
+        i32(center.y),
+        radii[0],
+        ball.color
+    )
+
+    rl.DrawRectangle(
+        i32(paddle.min.x), 
+        i32(paddle.min.y),
+        i32(paddle.max.x-paddle.min.x),
+        i32(paddle.max.y-paddle.min.y),
+        paddle.color
+    )
+
     for i in 0..<GRID_NUM_ROWS {
         for j in 0..<GRID_NUM_COLS {
             brick := bricks[i][j]
@@ -194,5 +226,18 @@ draw_game :: proc() {
 }
 
 main :: proc() {
+    rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
+    defer rl.CloseWindow() 
 
+    setup_game()
+ 
+    for !rl.WindowShouldClose() {
+
+        update_game()
+//
+        time.sleep(16.2 * time.Millisecond)
+
+        draw_game()
+
+    }
 }
