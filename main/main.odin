@@ -247,6 +247,20 @@ update_game :: proc () {
     }
 
     // 4. Check to see if ball has collided with wall
+    c, r = bounding_box_center(ball), bounding_box_radii(ball)
+    for wall, i in walls {
+        min_x, max_x := wall.min.x - r.x, wall.max.x + r.x 
+        min_y, max_y := wall.min.y - r.y, wall.max.y + r.y 
+        if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
+
+            // TODO(jrr): should there be some variable indicating that a collision has occured
+            switch i {
+            case 0:    ball.velocity.y = -ball.velocity.y 
+            case 1, 2: ball.velocity.x = -ball.velocity.x 
+            }
+
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     // update
@@ -258,7 +272,7 @@ setup_game :: proc() {
         box        = {min={BALL_MIN_X, BALL_MIN_Y}, max={BALL_MAX_X, BALL_MAX_Y}},
         shape_type = .Circle,
         color      = BALL_COLOR,
-        velocity   = {0, 20.0}
+        velocity   = {0, 500.0}
     }
 
     paddle = {
@@ -286,19 +300,20 @@ setup_game :: proc() {
     }
     
     walls = {
-        {
+
+        {   // TOP
             box        = {min={-10, -10}, max={SCREEN_WIDTH+10, +10}},
             shape_type = .Rectangle, 
             color      = rl.YELLOW,
             visible    = true
         },
-        {
+        {   // LEFT
             box        = {min={-10, -10}, max={+10, SCREEN_HEIGHT+10}},
             shape_type = .Rectangle, 
             color      = rl.YELLOW,
             visible    = true
         },
-        {
+        {   // RIGHT
             box        = {min={SCREEN_WIDTH-10, -10}, max={SCREEN_WIDTH+10, SCREEN_HEIGHT+10}},
             shape_type = .Rectangle, 
             color      = rl.YELLOW,
