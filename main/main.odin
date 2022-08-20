@@ -107,10 +107,11 @@ circle :: proc(center: [2] f32, radius: f32) -> Entity {
 //bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Entity
 
 
-collision :: proc(e1: Entity, e2: Entity) -> bool {
-    // Uses Minkowski sum technique to determine if the circle collides 
-    // with the ball.  In this case, we're extending the restangle by the
-    // radis of the cirle
+collision :: proc(e1: Entity, e2: Entity) -> (location: [2] f32, do_collide: bool) {
+    // Uses Minkowski sum technique to determine if the
+    // bounding boxes for the shapes collide.  If they do 
+    // collide, we'll use a different algorithm to determine 
+    // where they collide
 
     c := bounding_box_center(e1)
     r := bounding_box_radii(e1)
@@ -119,9 +120,35 @@ collision :: proc(e1: Entity, e2: Entity) -> bool {
     min_x, max_x := e2.min.x - r.x, e2.max.x + r.x 
     min_y, max_y := e2.min.y - r.y, e2.max.y + r.y 
 
-    return min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y 
+    do_collide = min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y 
+
+    if do_collide {
+        t: [4] f32 
+        dE := linalg.normalize(e1.velocity)
+
+        t[0] = (min_x - c.x) / dE.x
+        t[1] = (max_x - c.x) / dE.x 
+        t[2] = (min_y - c.y) / dE.y 
+        t[3] = (max_y - c.y) / dE.y
+
+        best_t: f32 = 0.0
+        best_i: int = 0
+
+        for ti, i in t {
+            if ti < best_t && ti > 0 {
+                best_t = ti
+                best_i = i
+            }
+        }
+        location = c + best_t*dE
+    }
+
+    return location, do_collide
 }
 
+collision_location:: proc(ball: Entity, e2: Entity) -> [2] f32 {
+    return ---
+}
 
 //setup_game :: proc() {
 //    ball = Projectile {
@@ -199,4 +226,6 @@ main :: proc() {
     fmt.println(collision(e2, e3))
 
     fmt.println(e2.box)
+
+    fmt.println(linalg.min(e1.min))
 }
