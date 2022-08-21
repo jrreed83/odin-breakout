@@ -87,10 +87,12 @@ Entity :: struct {
 }
 
 
-ball   : Entity  
-paddle : Entity
-bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Entity
-walls  : [4] Entity 
+ball    : Entity  
+paddle  : Entity
+bricks  : [GRID_NUM_ROWS][GRID_NUM_COLS] Entity
+walls   : [4] Entity 
+
+bonuses : [GRID_NUM_COLS] Entity 
 
 collision :: proc(e1: Entity, e2: Entity) -> bool {
     // Uses Minkowski sum technique to determine if the
@@ -313,8 +315,8 @@ setup_game :: proc() {
     }
 
 
+    // TODO: forget grid of bricks, just use a single array
     brick_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y}
-    
     for i in 0..<GRID_NUM_ROWS {
         brick_min.x = GRID_PADDING_X
             for j in 0..<GRID_NUM_COLS {
@@ -356,7 +358,6 @@ setup_game :: proc() {
             color      = rl.YELLOW,
             visible    = true
         },
-
     }
 }
 
@@ -431,7 +432,5 @@ main :: proc() {
         draw_game()
         time.stopwatch_reset(&stopwatch)
     }
-
-    fmt.println(rl.GetFrameTime())
 
 }
