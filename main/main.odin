@@ -11,7 +11,8 @@ import libc  "core:c/libc"
 SCREEN_WIDTH     :: 850
 SCREEN_HEIGHT    :: 650
 FRAME_RATE       :: 60
-SAMPLE_RATE      :: 60
+UPDATE_RATE      :: FRAME_RATE
+REFRESH_TIME     :  time.Duration : time.Duration(16*time.Millisecond)
 
 BACKGROUND_COLOR :: rl.BLACK 
 
@@ -27,7 +28,7 @@ PADDLE_CENTER_X  :: 0.5*(PADDLE_MIN_X + PADDLE_MAX_X)
 PADDLE_SPEED     :: 100
 
 BALL_COLOR       :: rl.WHITE
-BALL_RADIUS      :: 5
+BALL_RADIUS      :: 8
 BALL_MIN_X       :: PADDLE_CENTER_X - BALL_RADIUS -5
 BALL_MAX_X       :: BALL_MIN_X + 2*BALL_RADIUS 
 BALL_MIN_Y       :: PADDLE_MIN_Y - 10*BALL_RADIUS 
@@ -44,9 +45,7 @@ BRICK_SPACING  :: 10
 GRID_PADDING_Y :: 50
 GRID_PADDING_X :: 0.5*(SCREEN_WIDTH - BRICK_WIDTH * GRID_NUM_COLS - BRICK_SPACING * (GRID_NUM_COLS-1))
 
-#assert(SCREEN_WIDTH == 850)
-
-dt: f32 = 1.0 / SAMPLE_RATE
+dt: f32 = 1.0 / UPDATE_RATE
 
 friction :f32 = 1.0 
 
@@ -63,6 +62,10 @@ BoundingBox :: struct {
     max: [2] f32   // lower right visually
 }
 
+Edge :: enum int {
+    North, South, East, West
+}
+
 bounding_box_center :: proc (e: Entity) -> [2] f32 {
     return {0.5*(e.min.x + e.max.x), 0.5*(e.min.y + e.max.y)}
 }
@@ -71,20 +74,23 @@ bounding_box_radii :: proc (e: Entity) -> [2] f32 {
     return {0.5*(e.max.x - e.min.x), 0.5*(e.max.y - e.min.y)}
 }
 
+paused := false 
+
 Entity :: struct {
     using box:   BoundingBox,
     shape_type:  ShapeType,
-    velocity:    [2] f32,
-    mass:            f32,
-    color:           rl.Color,
-    visible:         bool   
+    acceleration: [2] f32,
+    velocity:     [2] f32,
+    mass:             f32,
+    color:            rl.Color,
+    visible:          bool   
 }
 
 
 ball   : Entity  
 paddle : Entity
 bricks : [GRID_NUM_ROWS][GRID_NUM_COLS] Entity
-walls  : [3] Entity 
+walls  : [4] Entity 
 
 collision :: proc(e1: Entity, e2: Entity) -> bool {
     // Uses Minkowski sum technique to determine if the
@@ -108,29 +114,39 @@ collision_location:: proc(ball: Entity, e2: Entity) -> [2] f32 {
 }
 
 update_game :: proc () {
-    ball_acceleration :   [2] f32 = {0,0}
-    paddle_acceleration : [2] f32 = {0,0}
+
     
     ////////////////////////////////////////////////////////////////////////////
     // User input 
+    if rl.IsKeyPressed(.SPACE) {
+        paused = !paused
+    }
+
+    if paused { return }
+
+    ball.acceleration = {0,0}
+    paddle.acceleration = {0,0}    
     if rl.IsKeyDown(.LEFT) {
-        paddle_acceleration.x = -1000
+        paddle.acceleration.x = -1000
     }
 
     if rl.IsKeyDown(.RIGHT) {
-        paddle_acceleration.x = +1000
+        paddle.acceleration.x = +1000
     }
 
-
+    
     ////////////////////////////////////////////////////////////////////////////
+
     // physics
 
     // 1. Paddle: using some notion of drag, using semi-implicit Euler,
-    // meaning that the bounding box is updated using the new velocity 
-    paddle_acceleration += -5*paddle.velocity 
-    paddle.velocity += paddle_acceleration*dt
-    paddle.min += paddle.velocity*dt + 0.5*paddle_acceleration * (dt*dt) 
-    paddle.max += paddle.velocity*dt + 0.5*paddle_acceleration * (dt*dt) 
+    // meaning that the bounding box is updated using the new velocity.  If you calculate the
+    // limit of the velocity recurrence relation, the max velocity is 
+    // paddle.acceleration / drag. 
+    paddle.acceleration += -5*paddle.velocity 
+    paddle.velocity += paddle.acceleration*dt
+    paddle.min += paddle.velocity*dt + 0.5*paddle.acceleration * (dt*dt) 
+    paddle.max += paddle.velocity*dt + 0.5*paddle.acceleration * (dt*dt) 
     
     // 2. Ball
     ball.min += ball.velocity*dt 
@@ -158,7 +174,7 @@ update_game :: proc () {
                 paddle.max.x = wall.min.x 
             } 
 
-            paddle_acceleration = {0,0}
+            paddle.acceleration = {0,0}
             paddle.velocity = {0, 0}
 
         }
@@ -172,29 +188,42 @@ update_game :: proc () {
         
         d : [4]f32
 
-        // Determine where the ball hit the paddle
+        // Determine how far the center of the ball is from each of the enlarged edges
         // 1. top edge ...
         d[0] = c.y - min_y 
         
         // 2. bottom edge ...
         d[1] = max_y - c.y 
 
-        // 3. left edge ...
-        d[2] = c.x - min_x 
-
         // 4. right edge ...
-        d[3] = max_x - c.x 
+        d[2] = max_x - c.x 
 
-        index: int = 0 
-        smallest:= d[0]
+        // 3. left edge ...
+        d[3] = c.x - min_x 
+
+        // Find the closest edge
+        edge: int = 0 
+        best: = d[0]
         for di, i in d {
-            if di < smallest {
-                smallest = di 
-                index    = i
+            if di < best {
+                best = di 
+                edge = i
             }
         }
 
-        switch index {
+        // Determine intersection point along the closest enlarges edge
+        intersection_point: [2] f32
+        switch edge {
+        case 0: intersection_point = {(max_x - c.x) / (max_x - min_x), 0}
+        case 1: intersection_point = {(max_x - c.x) / (max_x - min_x), 1}
+        case 2: intersection_point = {1, (max_y - c.y) / (max_y - min_y)}
+        case 3: intersection_point = {0, (max_y - c.y) / (max_y - min_y)}
+        }
+
+        fmt.println(intersection_point)
+
+        // physics update
+        switch edge {
         case 0, 1: ball.velocity.y = -ball.velocity.y
         case 2, 3: ball.velocity.x = -ball.velocity.x
         }
@@ -218,11 +247,12 @@ update_game :: proc () {
                     // 2. bottom edge ...
                     d[1] = max_y - c.y 
 
-                    // 3. left edge ...
-                    d[2] = c.x - min_x 
-
                     // 4. right edge ...
-                    d[3] = max_x - c.x 
+                    d[2] = max_x - c.x 
+
+                    // 3. left edge ...
+                    d[3] = c.x - min_x 
+
 
                     index: int = 0 
                     smallest:= d[0]
@@ -234,7 +264,6 @@ update_game :: proc () {
                     }
 
                     // TODO: what about corner collision?
-                    fmt.println(d, index)
                     switch index {
                     case 0, 1: ball.velocity.y = -ball.velocity.y
                     case 2, 3: ball.velocity.x = -ball.velocity.x
@@ -255,8 +284,10 @@ update_game :: proc () {
 
             // TODO(jrr): should there be some variable indicating that a collision has occured
             switch i {
-            case 0:    ball.velocity.y = -ball.velocity.y 
-            case 1, 2: ball.velocity.x = -ball.velocity.x 
+            case 0, 1:    
+                ball.velocity.y = -ball.velocity.y 
+            case 2, 3: 
+                ball.velocity.x = -ball.velocity.x 
             }
 
         }
@@ -301,20 +332,26 @@ setup_game :: proc() {
     
     walls = {
 
-        {   // TOP
+        {   // TOP / NORTH
             box        = {min={-10, -10}, max={SCREEN_WIDTH+10, +10}},
             shape_type = .Rectangle, 
             color      = rl.YELLOW,
             visible    = true
         },
-        {   // LEFT
-            box        = {min={-10, -10}, max={+10, SCREEN_HEIGHT+10}},
+        {   // BOTTOM / SOUTH
+            box        = {min={0, SCREEN_HEIGHT}, max={SCREEN_WIDTH, SCREEN_HEIGHT+10}},
+            shape_type = .Rectangle,
+            color      = rl.YELLOW,
+            visible    = true
+        },
+        {   // RIGHT / EAST
+            box        = {min={SCREEN_WIDTH-10, -10}, max={SCREEN_WIDTH+10, SCREEN_HEIGHT+10}},
             shape_type = .Rectangle, 
             color      = rl.YELLOW,
             visible    = true
         },
-        {   // RIGHT
-            box        = {min={SCREEN_WIDTH-10, -10}, max={SCREEN_WIDTH+10, SCREEN_HEIGHT+10}},
+        {   // LEFT / WEST
+            box        = {min={-10, -10}, max={+10, SCREEN_HEIGHT+10}},
             shape_type = .Rectangle, 
             color      = rl.YELLOW,
             visible    = true
@@ -378,24 +415,23 @@ draw_game :: proc() {
 }
 
 main :: proc() {
+    stopwatch : time.Stopwatch
+
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
     defer rl.CloseWindow() 
 
     setup_game()
  
     for !rl.WindowShouldClose() {
-
+    
+        time.stopwatch_start(&stopwatch)
         update_game()
-//
-        time.sleep(16 * time.Millisecond)
-
+        time.stopwatch_stop(&stopwatch)
+        time.sleep(REFRESH_TIME - stopwatch._accumulation)
         draw_game()
-
+        time.stopwatch_reset(&stopwatch)
     }
 
-    v:[2][2]f32
+    fmt.println(rl.GetFrameTime())
 
-    v += 2.4 
-
-    fmt.println(v)
 }
