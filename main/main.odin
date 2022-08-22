@@ -39,8 +39,8 @@ BALL_SPEED       :: 300
 BRICK_HEIGHT   :: 25
 BRICK_WIDTH    :: 45 
 
-BONUS_HEIGHT   :: 10 
-BONUS_WIDTH    :: 30
+BONUS_HEIGHT   :: 15
+BONUS_WIDTH    :: BRICK_WIDTH
 
 GRID_NUM_ROWS  :: 6 
 GRID_NUM_COLS  :: 10 
@@ -78,11 +78,11 @@ Edge :: enum int {
     North, South, East, West
 }
 
-bounding_box_center :: proc (e: Entity) -> [2] f32 {
+bounding_box_center :: proc (e: ^Entity) -> [2] f32 {
     return {0.5*(e.min.x + e.max.x), 0.5*(e.min.y + e.max.y)}
 }
 
-bounding_box_radii :: proc (e: Entity) -> [2] f32 {
+bounding_box_radii :: proc (e: ^Entity) -> [2] f32 {
     return {0.5*(e.max.x - e.min.x), 0.5*(e.max.y - e.min.y)}
 }
 
@@ -102,37 +102,55 @@ Entity :: struct {
 
 
 // TODO: want a single array of entities, indices to separate types of entities into groups
-ball    : Entity  
-paddle  : Entity
-bricks  : [NUM_BRICKS] Entity
-walls   : [4] Entity 
 
-bonuses : [NUM_BRICKS] Entity 
+BALL_IDX     :: 0 
+PADDLE_IDX   :: 1 
+WALL_IDX     :: 2 
+BRICK_IDX    :: WALL_IDX + 4
+BONUS_IDX    :: BRICK_IDX + 60
+NUM_ENTITIES :: BONUS_IDX + 60
 
-collision :: proc(e1: Entity, e2: Entity) -> bool {
-    // Uses Minkowski sum technique to determine if the
-    // bounding boxes for the shapes collide.  If they do 
-    // collide, we'll use a different algorithm to determine 
-    // where they collide
+entities : [NUM_ENTITIES] Entity
 
-    c := bounding_box_center(e1)
-    r := bounding_box_radii(e1)
+ball    := &entities[BALL_IDX]
+paddle  := &entities[PADDLE_IDX]
+bricks  := &entities[BRICK_IDX]
+wall    := &entities[WALL_IDX]
+bonuses := &entities[BONUS_IDX]
+
+//ball    : Entity  
+//paddle  : Entity
+//bricks  : [NUM_BRICKS] Entity
+//walls   : [4] Entity 
+
+//bonuses : [NUM_BRICKS] Entity 
 
 
-    min_x, max_x := e2.min.x - r.x, e2.max.x + r.x 
-    min_y, max_y := e2.min.y - r.y, e2.max.y + r.y 
 
-    return min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y 
+//collision :: proc(e1: Entity, e2: Entity) -> bool {
+//    // Uses Minkowski sum technique to determine if the
+//    // bounding boxes for the shapes collide.  If they do 
+//    // collide, we'll use a different algorithm to determine 
+//    // where they collide
+//
+//    c := bounding_box_center(e1)
+//    r := bounding_box_radii(e1)
+//
+//
+//    min_x, max_x := e2.min.x - r.x, e2.max.x + r.x 
+//    min_y, max_y := e2.min.y - r.y, e2.max.y + r.y 
+//
+//    return min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y 
+//
+//}
 
-}
-
-collision_location:: proc(ball: Entity, e2: Entity) -> [2] f32 {
-    return ---
-}
+//collision_location:: proc(ball: Entity, e2: Entity) -> [2] f32 {
+//    return ---
+//}
 
 update_game :: proc () {
 
-    
+
     ////////////////////////////////////////////////////////////////////////////
     // User input 
     if rl.IsKeyPressed(.SPACE) {
@@ -176,7 +194,9 @@ update_game :: proc () {
     r: [2]f32
     // 1. Check to see if the paddle has collided with the wall.
     c, r = bounding_box_center(paddle), bounding_box_radii(paddle)
-    for wall in walls {
+    for i in WALL_IDX..<WALL_IDX+4 {
+        wall := entities[i]
+
         min_x, max_x := wall.min.x - r.x, wall.max.x + r.x 
         min_y, max_y := wall.min.y - r.y, wall.max.y + r.y 
         if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
@@ -245,7 +265,8 @@ update_game :: proc () {
         }
     }
     // 3. Check to see if ball has collided with any targets 
-    for brick, i in bricks {
+    for i in BRICK_IDX..<BRICK_IDX+60 {
+        brick := &entities[i]
         if brick.visible {
             min_x, max_x := brick.min.x - r.x, brick.max.x + r.x 
             min_y, max_y := brick.min.y - r.y, brick.max.y + r.y 
@@ -281,14 +302,15 @@ update_game :: proc () {
                 case 2, 3: ball.velocity.x = -ball.velocity.x
                 }
 
-                bricks[i].visible = false
+                brick.visible = false
             }
         }
     }
 
     // 4. Check to see if ball has collided with wall
     c, r = bounding_box_center(ball), bounding_box_radii(ball)
-    for wall, i in walls {
+    for i in WALL_IDX..<WALL_IDX+4 {
+        wall := entities[i]
         min_x, max_x := wall.min.x - r.x, wall.max.x + r.x 
         min_y, max_y := wall.min.y - r.y, wall.max.y + r.y 
         if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
@@ -311,7 +333,7 @@ update_game :: proc () {
 
 setup_game :: proc() {
     // ball ...
-    ball = {
+    ball^ = {
         box        = {min={BALL_MIN_X, BALL_MIN_Y}, max={BALL_MAX_X, BALL_MAX_Y}},
         shape_type = .Circle,
         color      = BALL_COLOR,
@@ -319,7 +341,7 @@ setup_game :: proc() {
     }
 
     // paddle ...
-    paddle = {
+    paddle^ = {
         box        = {min={PADDLE_MIN_X, PADDLE_MIN_Y}, max={PADDLE_MAX_X, PADDLE_MAX_Y}},
         shape_type = .Rectangle,
         color      = BALL_COLOR,   
@@ -330,9 +352,8 @@ setup_game :: proc() {
     brick_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y}
     row, col := 0, 0
     
-    for i in 0..<NUM_BRICKS {
-        fmt.println(row, i)
-        bricks[i] = {
+    for i in BRICK_IDX..<BRICK_IDX+60 {
+        entities[i] = {
             box        = {min = brick_min, max = brick_min + {BRICK_WIDTH, BRICK_HEIGHT}},
             shape_type = .Rectangle,
             color      = ROW_COLORS[row],
@@ -352,10 +373,10 @@ setup_game :: proc() {
     }
 
     // bounuses
-    bonus_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y + 0.5+BRICK_HEIGHT}
+    bonus_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y + 0.5*BRICK_HEIGHT}
     row, col = 0, 0
-    for _, i in bonuses {
-        bonuses[i] = {
+    for i in BONUS_IDX..<BONUS_IDX+60 {
+        entities[i] = {
             box        = {min = bonus_min, max = bonus_min + {BONUS_WIDTH, BONUS_HEIGHT}},
             shape_type = .Rectangle,
             color      = rl.LIGHTGRAY,
@@ -365,7 +386,7 @@ setup_game :: proc() {
         // wrap around...
         if col == 9 {
             bonus_min.x = GRID_PADDING_X
-            bonus_min.y = bonus_min.y + BRICK_SPACING + BRICK_HEIGHT 
+            bonus_min.y = bonus_min.y + BRICK_HEIGHT + BONUS_HEIGHT
             col = 0
             row = row + 1
         } else {
@@ -374,32 +395,36 @@ setup_game :: proc() {
         }
     }
     // walls ...
-    walls = {
+    entities[WALL_IDX + 0] = {   
+        // TOP / NORTH
+        box        = {min={-10, -10}, max={SCREEN_WIDTH+10, +10}},
+        shape_type = .Rectangle, 
+        color      = rl.YELLOW,
+        visible    = true
+    }
 
-        {   // TOP / NORTH
-            box        = {min={-10, -10}, max={SCREEN_WIDTH+10, +10}},
-            shape_type = .Rectangle, 
-            color      = rl.YELLOW,
-            visible    = true
-        },
-        {   // BOTTOM / SOUTH
-            box        = {min={0, SCREEN_HEIGHT}, max={SCREEN_WIDTH, SCREEN_HEIGHT+10}},
-            shape_type = .Rectangle,
-            color      = rl.YELLOW,
-            visible    = true
-        },
-        {   // RIGHT / EAST
-            box        = {min={SCREEN_WIDTH-10, -10}, max={SCREEN_WIDTH+10, SCREEN_HEIGHT+10}},
-            shape_type = .Rectangle, 
-            color      = rl.YELLOW,
-            visible    = true
-        },
-        {   // LEFT / WEST
-            box        = {min={-10, -10}, max={+10, SCREEN_HEIGHT+10}},
-            shape_type = .Rectangle, 
-            color      = rl.YELLOW,
-            visible    = true
-        },
+    entities[WALL_IDX + 1] = {
+        // BOTTOM / SOUTH
+        box        = {min={0, SCREEN_HEIGHT}, max={SCREEN_WIDTH, SCREEN_HEIGHT+10}},
+        shape_type = .Rectangle,
+        color      = rl.YELLOW,
+        visible    = true
+    }
+
+    entities[WALL_IDX + 2] = {
+        // RIGHT / EAST
+        box        = {min={SCREEN_WIDTH-10, -10}, max={SCREEN_WIDTH+10, SCREEN_HEIGHT+10}},
+        shape_type = .Rectangle, 
+        color      = rl.YELLOW,
+        visible    = true
+    }
+
+    entities[WALL_IDX + 3] = {
+        // LEFT / WEST
+        box        = {min={-10, -10}, max={+10, SCREEN_HEIGHT+10}},
+        shape_type = .Rectangle, 
+        color      = rl.YELLOW,
+        visible    = true
     }
 }
 
@@ -431,7 +456,8 @@ draw_game :: proc() {
         paddle.color
     )
 
-    for brick in bricks {
+    for i in BRICK_IDX..<BRICK_IDX+60 {
+        brick := entities[i]
         if brick.visible {
             rl.DrawRectangle(
                 i32(brick.min.x), 
@@ -443,7 +469,8 @@ draw_game :: proc() {
         }       
     }
 
-    for bonus in bonuses {
+    for i in BONUS_IDX..<BONUS_IDX+60 {
+        bonus := entities[i]
         if bonus.visible {
             rl.DrawRectangle(
                 i32(bonus.min.x), 
@@ -455,7 +482,8 @@ draw_game :: proc() {
         }       
     }
 
-    for wall in walls {
+    for i in WALL_IDX..<WALL_IDX+4 {
+        wall := entities[i]
         rl.DrawRectangle(
             i32(wall.min.x), 
             i32(wall.min.y),
