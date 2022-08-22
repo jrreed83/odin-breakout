@@ -39,8 +39,12 @@ BALL_SPEED       :: 300
 BRICK_HEIGHT   :: 25
 BRICK_WIDTH    :: 45 
 
+BONUS_HEIGHT   :: 10 
+BONUS_WIDTH    :: 30
+
 GRID_NUM_ROWS  :: 6 
 GRID_NUM_COLS  :: 10 
+NUM_BRICKS     :: GRID_NUM_COLS * GRID_NUM_ROWS
 BRICK_SPACING  :: 10
 GRID_PADDING_Y :: 50
 GRID_PADDING_X :: 0.5*(SCREEN_WIDTH - BRICK_WIDTH * GRID_NUM_COLS - BRICK_SPACING * (GRID_NUM_COLS-1))
@@ -55,6 +59,14 @@ ShapeType :: enum u8 {
     Rectangle,
     Circle,
     Line 
+}
+
+EntityType :: enum u8 {
+    Ball,
+    Paddle,
+    Brick,
+    Bonus,
+    Wall
 }
 
 BoundingBox :: struct {
@@ -77,8 +89,10 @@ bounding_box_radii :: proc (e: Entity) -> [2] f32 {
 paused := false 
 
 Entity :: struct {
+    entity_type: EntityType,
     using box:   BoundingBox,
     shape_type:  ShapeType,
+    
     acceleration: [2] f32,
     velocity:     [2] f32,
     mass:             f32,
@@ -87,12 +101,13 @@ Entity :: struct {
 }
 
 
+// TODO: want a single array of entities, indices to separate types of entities into groups
 ball    : Entity  
 paddle  : Entity
-bricks  : [GRID_NUM_ROWS][GRID_NUM_COLS] Entity
+bricks  : [NUM_BRICKS] Entity
 walls   : [4] Entity 
 
-bonuses : [GRID_NUM_COLS] Entity 
+bonuses : [NUM_BRICKS] Entity 
 
 collision :: proc(e1: Entity, e2: Entity) -> bool {
     // Uses Minkowski sum technique to determine if the
@@ -126,6 +141,7 @@ update_game :: proc () {
 
     if paused { return }
 
+    // TODO: change to force and derive acceleration
     ball.acceleration = {0,0}
     paddle.acceleration = {0,0}    
     if rl.IsKeyDown(.LEFT) {
@@ -222,8 +238,6 @@ update_game :: proc () {
         case 3: intersection_point = {0, (max_y - c.y) / (max_y - min_y)}
         }
 
-        fmt.println(intersection_point)
-
         // physics update
         switch edge {
         case 0, 1: ball.velocity.y = -ball.velocity.y
@@ -231,48 +245,43 @@ update_game :: proc () {
         }
     }
     // 3. Check to see if ball has collided with any targets 
-    for i in 0..<GRID_NUM_ROWS {
-        for j in 0..<GRID_NUM_COLS {
+    for brick, i in bricks {
+        if brick.visible {
+            min_x, max_x := brick.min.x - r.x, brick.max.x + r.x 
+            min_y, max_y := brick.min.y - r.y, brick.max.y + r.y 
+            if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
+                d : [4]f32
 
-            brick := bricks[i][j]
-
-            if brick.visible {
-                min_x, max_x := brick.min.x - r.x, brick.max.x + r.x 
-                min_y, max_y := brick.min.y - r.y, brick.max.y + r.y 
-                if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
-                    d : [4]f32
-
-                    // Determine where the ball hits the brick
-                    // 1. top edge ...
-                    d[0] = c.y - min_y 
+                // Determine where the ball hits the brick
+                // 1. top edge ...
+                d[0] = c.y - min_y 
         
-                    // 2. bottom edge ...
-                    d[1] = max_y - c.y 
+                // 2. bottom edge ...
+                d[1] = max_y - c.y 
 
-                    // 4. right edge ...
-                    d[2] = max_x - c.x 
+                // 4. right edge ...
+                d[2] = max_x - c.x 
 
-                    // 3. left edge ...
-                    d[3] = c.x - min_x 
+                // 3. left edge ...
+                d[3] = c.x - min_x 
 
 
-                    index: int = 0 
-                    smallest:= d[0]
-                    for di, i in d {
-                        if di < smallest {
-                            smallest = di 
-                            index    = i
-                        }
+                index: int = 0 
+                smallest:= d[0]
+                for di, i in d {
+                    if di < smallest {
+                        smallest = di 
+                        index    = i
                     }
-
-                    // TODO: what about corner collision?
-                    switch index {
-                    case 0, 1: ball.velocity.y = -ball.velocity.y
-                    case 2, 3: ball.velocity.x = -ball.velocity.x
-                    }
-
-                    bricks[i][j].visible = false
                 }
+
+                // TODO: what about corner collision?
+                switch index {
+                case 0, 1: ball.velocity.y = -ball.velocity.y
+                case 2, 3: ball.velocity.x = -ball.velocity.x
+                }
+
+                bricks[i].visible = false
             }
         }
     }
@@ -301,6 +310,7 @@ update_game :: proc () {
 
 
 setup_game :: proc() {
+    // ball ...
     ball = {
         box        = {min={BALL_MIN_X, BALL_MIN_Y}, max={BALL_MAX_X, BALL_MAX_Y}},
         shape_type = .Circle,
@@ -308,6 +318,7 @@ setup_game :: proc() {
         velocity   = {0, 500.0}
     }
 
+    // paddle ...
     paddle = {
         box        = {min={PADDLE_MIN_X, PADDLE_MIN_Y}, max={PADDLE_MAX_X, PADDLE_MAX_Y}},
         shape_type = .Rectangle,
@@ -315,23 +326,54 @@ setup_game :: proc() {
     }
 
 
-    // TODO: forget grid of bricks, just use a single array
+    // bricks ...
     brick_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y}
-    for i in 0..<GRID_NUM_ROWS {
-        brick_min.x = GRID_PADDING_X
-            for j in 0..<GRID_NUM_COLS {
-                bricks[i][j] = {
-                    box        = {min = brick_min, max = brick_min + {BRICK_WIDTH, BRICK_HEIGHT}},
-                    shape_type = .Rectangle,
-                    color      = ROW_COLORS[i],
-                    visible    = true
-
-            }
-            brick_min.x += (BRICK_WIDTH + BRICK_SPACING)
-        }
-        brick_min.y += (BRICK_HEIGHT + BRICK_SPACING)
-    }
+    row, col := 0, 0
     
+    for i in 0..<NUM_BRICKS {
+        fmt.println(row, i)
+        bricks[i] = {
+            box        = {min = brick_min, max = brick_min + {BRICK_WIDTH, BRICK_HEIGHT}},
+            shape_type = .Rectangle,
+            color      = ROW_COLORS[row],
+            visible    = true    
+        }
+
+        // wrap around...
+        if col == 9 {
+            brick_min.x = GRID_PADDING_X
+            brick_min.y = brick_min.y + BRICK_SPACING + BRICK_HEIGHT 
+            col = 0
+            row = row+1
+        } else {
+            brick_min.x   = brick_min.x + BRICK_SPACING + BRICK_WIDTH
+            col += 1
+        }
+    }
+
+    // bounuses
+    bonus_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y + 0.5+BRICK_HEIGHT}
+    row, col = 0, 0
+    for _, i in bonuses {
+        bonuses[i] = {
+            box        = {min = bonus_min, max = bonus_min + {BONUS_WIDTH, BONUS_HEIGHT}},
+            shape_type = .Rectangle,
+            color      = rl.LIGHTGRAY,
+            visible    = true    
+        }
+
+        // wrap around...
+        if col == 9 {
+            bonus_min.x = GRID_PADDING_X
+            bonus_min.y = bonus_min.y + BRICK_SPACING + BRICK_HEIGHT 
+            col = 0
+            row = row + 1
+        } else {
+            bonus_min.x   = bonus_min.x + BRICK_SPACING + BRICK_WIDTH
+            col += 1
+        }
+    }
+    // walls ...
     walls = {
 
         {   // TOP / NORTH
@@ -389,19 +431,28 @@ draw_game :: proc() {
         paddle.color
     )
 
-    for i in 0..<GRID_NUM_ROWS {
-        for j in 0..<GRID_NUM_COLS {
-            brick := bricks[i][j]
-            if brick.visible {
-                rl.DrawRectangle(
-                    i32(brick.min.x), 
-                    i32(brick.min.y),
-                    i32(brick.max.x-brick.min.x),
-                    i32(brick.max.y-brick.min.y),
-                    brick.color
-                )
-            }      
-        }
+    for brick in bricks {
+        if brick.visible {
+            rl.DrawRectangle(
+                i32(brick.min.x), 
+                i32(brick.min.y),
+                i32(brick.max.x-brick.min.x),
+                i32(brick.max.y-brick.min.y),
+                brick.color
+            )
+        }       
+    }
+
+    for bonus in bonuses {
+        if bonus.visible {
+            rl.DrawRectangle(
+                i32(bonus.min.x), 
+                i32(bonus.min.y),
+                i32(bonus.max.x-bonus.min.x),
+                i32(bonus.max.y-bonus.min.y),
+                bonus.color
+            )
+        }       
     }
 
     for wall in walls {
