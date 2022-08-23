@@ -65,7 +65,6 @@ EntityType :: enum u8 {
     Ball,
     Paddle,
     Brick,
-    Bonus,
     Wall
 }
 
@@ -105,7 +104,8 @@ Entity :: struct {
     mass:             f32,
     color:            rl.Color,
     visible:          bool,   
-    health:           u8
+    health:           u8,
+    moving:           bool
 }
 
 
@@ -114,17 +114,14 @@ BALL_IDX     :: 0
 PADDLE_IDX   :: 1 
 WALL_IDX     :: 2 
 BRICK_IDX    :: WALL_IDX + 4
-BONUS_IDX    :: BRICK_IDX + 60
-NUM_ENTITIES :: BONUS_IDX + 60
+NUM_ENTITIES :: BRICK_IDX + 60
 
 entities : [NUM_ENTITIES] Entity
+collisions : [NUM_ENTITIES][NUM_ENTITIES] bool 
 
 update_game :: proc () {
 
     // initialize for frame 
-//    for i in 0..<NUM_ENTITIES {
-
-//    }    
     paddle := &entities[PADDLE_IDX]
     ball   := &entities[BALL_IDX]
     ////////////////////////////////////////////////////////////////////////////
@@ -160,18 +157,24 @@ update_game :: proc () {
         }
 
         if entity.entity_type == .Ball {
+            //entity.position += entity.velocity*dt
             entity.min += entity.velocity*dt 
             entity.max += entity.velocity*dt     
         }
 
-        if entity.entity_type == .Bonus {
+        if entity.entity_type == .Brick {
+            //entity.position += entity.velocity*dt
             entity.min += entity.velocity*dt 
             entity.max += entity.velocity*dt        
         }
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // collision detection
+    // collision detection in two phases
+    // 1. determine which entities collide 
+    // 2. Get more information about the collisions
+    // 3. Update the physics in response to a collision 
+
     //for i in 0..<NUM_ENTITIES {
     //    entity := &entities[i]
     //    
@@ -179,7 +182,26 @@ update_game :: proc () {
     //    
     //    }    
     //}
+    // want a visited array so we don't duplicate work?
+    // Collision detection using Minkowski sum/difference
+    for i in 0..<NUM_ENTITIES {
+        e0 := &entities[i]
+        c0 := bounding_box_center(e0)
+        r0 := bounding_box_radii(e0)
 
+        for j in 0..<NUM_ENTITIES {
+            if j != i {
+                e1 := &entities[j]
+                min_x, max_x := e1.min.x - r0.x, e1.max.x + r0.x 
+                min_y, max_y := e1.min.y - r0.y, e1.max.y + r0.y 
+                collisions[i][j] = min_x <= c0.x && c0.x <= max_x && min_y <= c0.y && c0.y <= max_y
+            }
+        }
+    }
+
+
+
+    /////////////////////////////////////////////////////////////////////////////
     c: [2]f32
     r: [2]f32
     // 1. Check to see if the paddle has collided with the wall.
@@ -257,7 +279,7 @@ update_game :: proc () {
     // 3. Check to see if ball has collided with any targets 
     for i in BRICK_IDX..<BRICK_IDX+60 {
         brick := &entities[i]
-        if brick.visible {
+        if brick.visible && !brick.moving {
             min_x, max_x := brick.min.x - r.x, brick.max.x + r.x 
             min_y, max_y := brick.min.y - r.y, brick.max.y + r.y 
             if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
@@ -292,13 +314,11 @@ update_game :: proc () {
                 case 2, 3: ball.velocity.x = -ball.velocity.x
                 }
 
-                brick.visible = false
-
-                // bonus brick should fall 
-                id := i + 60
-                bonus := &entities[id]
-                bonus.visible = true
-                bonus.velocity.y = +50
+                brick.velocity.y = +50
+                brick.color      = rl.LIGHTGRAY  
+                brick.min        = brick.min + 5
+                brick.max        = brick.max - 5 
+                brick.moving     = true
 
             }
         }
@@ -359,7 +379,8 @@ setup_game :: proc() {
             box        = {min = brick_min, max = brick_min + {BRICK_WIDTH, BRICK_HEIGHT}},
             shape_type = .Rectangle,
             color      = ROW_COLORS[row],
-            visible    = true    
+            visible    = true,
+            moving     = false,    
         }
 
         // wrap around...
@@ -374,29 +395,6 @@ setup_game :: proc() {
         }
     }
 
-    // bounuses
-    bonus_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y + 0.5*BRICK_HEIGHT}
-    row, col = 0, 0
-    for i in BONUS_IDX..<BONUS_IDX+60 {
-        entities[i] = {
-            box        = {min = bonus_min, max = bonus_min + {BONUS_WIDTH, BONUS_HEIGHT}},
-            shape_type = .Rectangle,
-            color      = rl.LIGHTGRAY,
-            visible    = false,
-            velocity   = {0,0}    
-        }
-
-        // wrap around...
-        if col == 9 {
-            bonus_min.x = GRID_PADDING_X
-            bonus_min.y = bonus_min.y + BRICK_HEIGHT + BONUS_HEIGHT
-            col = 0
-            row = row + 1
-        } else {
-            bonus_min.x   = bonus_min.x + BRICK_SPACING + BRICK_WIDTH
-            col += 1
-        }
-    }
     // walls ...
     entities[WALL_IDX + 0] = {   
         // TOP / NORTH
@@ -480,7 +478,9 @@ main :: proc() {
         update_game()
         time.stopwatch_stop(&stopwatch)
         time.sleep(REFRESH_TIME - stopwatch._accumulation)
+
         draw_game()
+        
         time.stopwatch_reset(&stopwatch)
     }
 
