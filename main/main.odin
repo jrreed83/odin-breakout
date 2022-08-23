@@ -11,7 +11,7 @@ import libc  "core:c/libc"
 SCREEN_WIDTH     :: 850
 SCREEN_HEIGHT    :: 650
 FRAME_RATE       :: 60
-UPDATE_RATE      :: FRAME_RATE
+UPDATE_RATE      :: FRAME_RATE / 2
 REFRESH_TIME     :  time.Duration : time.Duration(16*time.Millisecond)
 
 BACKGROUND_COLOR :: rl.BLACK 
@@ -79,11 +79,18 @@ Edge :: enum int {
 }
 
 bounding_box_center :: proc (e: ^Entity) -> [2] f32 {
-    return {0.5*(e.min.x + e.max.x), 0.5*(e.min.y + e.max.y)}
+
+    x := 0.5*(e.min.x + e.max.x)
+    y := 0.5*(e.min.y + e.max.y)
+    return {x, y}
 }
 
 bounding_box_radii :: proc (e: ^Entity) -> [2] f32 {
-    return {0.5*(e.max.x - e.min.x), 0.5*(e.max.y - e.min.y)}
+
+    x := 0.5*(e.max.x - e.min.x)
+    y := 0.5*(e.max.y - e.min.y)
+
+    return {x, y}
 }
 
 paused := false 
@@ -97,12 +104,12 @@ Entity :: struct {
     velocity:     [2] f32,
     mass:             f32,
     color:            rl.Color,
-    visible:          bool   
+    visible:          bool,   
+    health:           u8
 }
 
 
 // TODO: want a single array of entities, indices to separate types of entities into groups
-
 BALL_IDX     :: 0 
 PADDLE_IDX   :: 1 
 WALL_IDX     :: 2 
@@ -112,45 +119,14 @@ NUM_ENTITIES :: BONUS_IDX + 60
 
 entities : [NUM_ENTITIES] Entity
 
-ball    := &entities[BALL_IDX]
-paddle  := &entities[PADDLE_IDX]
-bricks  := &entities[BRICK_IDX]
-wall    := &entities[WALL_IDX]
-bonuses := &entities[BONUS_IDX]
-
-//ball    : Entity  
-//paddle  : Entity
-//bricks  : [NUM_BRICKS] Entity
-//walls   : [4] Entity 
-
-//bonuses : [NUM_BRICKS] Entity 
-
-
-
-//collision :: proc(e1: Entity, e2: Entity) -> bool {
-//    // Uses Minkowski sum technique to determine if the
-//    // bounding boxes for the shapes collide.  If they do 
-//    // collide, we'll use a different algorithm to determine 
-//    // where they collide
-//
-//    c := bounding_box_center(e1)
-//    r := bounding_box_radii(e1)
-//
-//
-//    min_x, max_x := e2.min.x - r.x, e2.max.x + r.x 
-//    min_y, max_y := e2.min.y - r.y, e2.max.y + r.y 
-//
-//    return min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y 
-//
-//}
-
-//collision_location:: proc(ball: Entity, e2: Entity) -> [2] f32 {
-//    return ---
-//}
-
 update_game :: proc () {
 
+    // initialize for frame 
+//    for i in 0..<NUM_ENTITIES {
 
+//    }    
+    paddle := &entities[PADDLE_IDX]
+    ball   := &entities[BALL_IDX]
     ////////////////////////////////////////////////////////////////////////////
     // User input 
     if rl.IsKeyPressed(.SPACE) {
@@ -160,36 +136,50 @@ update_game :: proc () {
     if paused { return }
 
     // TODO: change to force and derive acceleration
-    ball.acceleration = {0,0}
-    paddle.acceleration = {0,0}    
     if rl.IsKeyDown(.LEFT) {
-        paddle.acceleration.x = -1000
-    }
-
-    if rl.IsKeyDown(.RIGHT) {
-        paddle.acceleration.x = +1000
+        entities[PADDLE_IDX].acceleration.x = -1000
+    } else if rl.IsKeyDown(.RIGHT) {
+        entities[PADDLE_IDX].acceleration.x = +1000
+    } else {
+        entities[PADDLE_IDX].acceleration.x = 0
     }
 
     
     ////////////////////////////////////////////////////////////////////////////
-
     // physics
 
-    // 1. Paddle: using some notion of drag, using semi-implicit Euler,
-    // meaning that the bounding box is updated using the new velocity.  If you calculate the
-    // limit of the velocity recurrence relation, the max velocity is 
-    // paddle.acceleration / drag. 
-    paddle.acceleration += -5*paddle.velocity 
-    paddle.velocity += paddle.acceleration*dt
-    paddle.min += paddle.velocity*dt + 0.5*paddle.acceleration * (dt*dt) 
-    paddle.max += paddle.velocity*dt + 0.5*paddle.acceleration * (dt*dt) 
-    
-    // 2. Ball
-    ball.min += ball.velocity*dt 
-    ball.max += ball.velocity*dt 
+    for i in 0..<NUM_ENTITIES {
+        entity := &entities[i]
+
+        if entity.entity_type == .Paddle {
+            entity.acceleration += -5*entity.velocity 
+            entity.velocity     += entity.acceleration*dt
+            //entity.position     += entity.velocity*dt + 0.5*entity.acceleration * (dt*dt)
+            entity.min          += entity.velocity*dt + 0.5*entity.acceleration * (dt*dt) 
+            entity.max          += entity.velocity*dt + 0.5*entity.acceleration * (dt*dt)             
+        }
+
+        if entity.entity_type == .Ball {
+            entity.min += entity.velocity*dt 
+            entity.max += entity.velocity*dt     
+        }
+
+        if entity.entity_type == .Bonus {
+            entity.min += entity.velocity*dt 
+            entity.max += entity.velocity*dt        
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     // collision detection
+    //for i in 0..<NUM_ENTITIES {
+    //    entity := &entities[i]
+    //    
+    //    if entity.entity_type == .Paddle {
+    //    
+    //    }    
+    //}
+
     c: [2]f32
     r: [2]f32
     // 1. Check to see if the paddle has collided with the wall.
@@ -303,6 +293,13 @@ update_game :: proc () {
                 }
 
                 brick.visible = false
+
+                // bonus brick should fall 
+                id := i + 60
+                bonus := &entities[id]
+                bonus.visible = true
+                bonus.velocity.y = +50
+
             }
         }
     }
@@ -316,7 +313,8 @@ update_game :: proc () {
         if min_x <= c.x && c.x <= max_x && min_y <= c.y && c.y <= max_y {
 
             // TODO(jrr): should there be some variable indicating that a collision has occured
-            switch i {
+            offset := i-WALL_IDX
+            switch offset {
             case 0, 1:    
                 ball.velocity.y = -ball.velocity.y 
             case 2, 3: 
@@ -333,18 +331,22 @@ update_game :: proc () {
 
 setup_game :: proc() {
     // ball ...
-    ball^ = {
-        box        = {min={BALL_MIN_X, BALL_MIN_Y}, max={BALL_MAX_X, BALL_MAX_Y}},
-        shape_type = .Circle,
-        color      = BALL_COLOR,
-        velocity   = {0, 500.0}
+    entities[BALL_IDX] = {
+        box         = {min={BALL_MIN_X, BALL_MIN_Y}, max={BALL_MAX_X, BALL_MAX_Y}},
+        shape_type  = .Circle,
+        entity_type = .Ball,
+        color       = BALL_COLOR,
+        velocity    = {0, 250.0},
+        visible     = true
     }
 
     // paddle ...
-    paddle^ = {
-        box        = {min={PADDLE_MIN_X, PADDLE_MIN_Y}, max={PADDLE_MAX_X, PADDLE_MAX_Y}},
-        shape_type = .Rectangle,
-        color      = BALL_COLOR,   
+    entities[PADDLE_IDX] = {
+        box         = {min={PADDLE_MIN_X, PADDLE_MIN_Y}, max={PADDLE_MAX_X, PADDLE_MAX_Y}},
+        shape_type  = .Rectangle,
+        color       = BALL_COLOR,   
+        entity_type = .Paddle,        
+        visible     = true,
     }
 
 
@@ -380,7 +382,8 @@ setup_game :: proc() {
             box        = {min = bonus_min, max = bonus_min + {BONUS_WIDTH, BONUS_HEIGHT}},
             shape_type = .Rectangle,
             color      = rl.LIGHTGRAY,
-            visible    = true    
+            visible    = false,
+            velocity   = {0,0}    
         }
 
         // wrap around...
@@ -428,6 +431,22 @@ setup_game :: proc() {
     }
 }
 
+draw_entity :: proc(entity: ^Entity) {
+    if entity.shape_type == .Circle {
+        c := bounding_box_center(entity)
+        r := bounding_box_radii(entity)
+        rl.DrawCircle(i32(c.x), i32(c.y), r.x, entity.color)
+    } else {
+        rl.DrawRectangle(
+            i32(entity.min.x), 
+            i32(entity.min.y),
+            i32(entity.max.x-entity.min.x),
+            i32(entity.max.y-entity.min.y),
+            entity.color
+        )
+    }         
+}
+
 ROW_COLORS : [6] rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
 
 draw_game :: proc() {
@@ -439,58 +458,11 @@ draw_game :: proc() {
 
     rl.DrawText(rl.TextFormat("Score: %d", score), 40, 40, 20, rl.WHITE)
 
-    center := bounding_box_center(ball)
-    radii  := bounding_box_radii(ball)
-    rl.DrawCircle(
-        i32(center.x), 
-        i32(center.y),
-        radii[0],
-        ball.color
-    )
-
-    rl.DrawRectangle(
-        i32(paddle.min.x), 
-        i32(paddle.min.y),
-        i32(paddle.max.x-paddle.min.x),
-        i32(paddle.max.y-paddle.min.y),
-        paddle.color
-    )
-
-    for i in BRICK_IDX..<BRICK_IDX+60 {
-        brick := entities[i]
-        if brick.visible {
-            rl.DrawRectangle(
-                i32(brick.min.x), 
-                i32(brick.min.y),
-                i32(brick.max.x-brick.min.x),
-                i32(brick.max.y-brick.min.y),
-                brick.color
-            )
-        }       
-    }
-
-    for i in BONUS_IDX..<BONUS_IDX+60 {
-        bonus := entities[i]
-        if bonus.visible {
-            rl.DrawRectangle(
-                i32(bonus.min.x), 
-                i32(bonus.min.y),
-                i32(bonus.max.x-bonus.min.x),
-                i32(bonus.max.y-bonus.min.y),
-                bonus.color
-            )
-        }       
-    }
-
-    for i in WALL_IDX..<WALL_IDX+4 {
-        wall := entities[i]
-        rl.DrawRectangle(
-            i32(wall.min.x), 
-            i32(wall.min.y),
-            i32(wall.max.x-wall.min.x),
-            i32(wall.max.y-wall.min.y),
-            wall.color
-        )     
+    for i in 0..<NUM_ENTITIES {
+        entity := &entities[i]
+        if entity.visible {
+            draw_entity(entity)
+        }
     }
 }
 
