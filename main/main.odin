@@ -96,17 +96,21 @@ bounding_box_radii :: proc (e: ^Entity) -> [2] f32 {
 paused := false 
 
 Entity :: struct {
-    entity_type: EntityType,
-    using box:   BoundingBox,
-    shape_type:  ShapeType,
+    id: int,
+
+    mass:    32,
+    color:   rl.Color,
+    visible: bool,   
+    health:  u8,
+    moving:  bool
     
     acceleration: [2] f32,
     velocity:     [2] f32,
-    mass:             f32,
-    color:            rl.Color,
-    visible:          bool,   
-    health:           u8,
-    moving:           bool
+
+
+    entity_type: EntityType,
+    using box:   BoundingBox,
+    shape_type:  ShapeType,
 }
 
 
@@ -155,7 +159,7 @@ update_game :: proc () {
             //entity.position     += entity.velocity*dt + 0.5*entity.acceleration * (dt*dt)
             entity.min          += entity.velocity*dt + 0.5*entity.acceleration * (dt*dt) 
             entity.max          += entity.velocity*dt + 0.5*entity.acceleration * (dt*dt)             
-        }
+        } 
 
         if entity.entity_type == .Ball {
             //entity.position += entity.velocity*dt
@@ -177,12 +181,13 @@ update_game :: proc () {
     // 2. narrow phase where we actually determine if a collision occurs
     // 3. Update the physics in response to a collision 
 
-    //for i in 0..<NUM_ENTITIES {
-    //    entity := &entities[i]
-    //    
-    //    if entity.entity_type == .Paddle {
-    //    
-    //    }    
+    // for i in 0..<NUM_ENTITIES {
+    //    entity := entities[i]
+    //    hash_entity(&spatial_hash_tbl, entity)
+    // }
+    //
+    // for i in 0..<len(spatial_hash_tbl) {
+    //     f    
     //}
     // want a visited array so we don't duplicate work?
     // Collision detection using Minkowski sum/difference
@@ -359,7 +364,8 @@ setup_game :: proc() {
         entity_type = .Ball,
         color       = BALL_COLOR,
         velocity    = {0, 250.0},
-        visible     = true
+        visible     = true,
+        id          = BALL_IDX
     }
 
     // paddle ...
@@ -369,6 +375,7 @@ setup_game :: proc() {
         color       = BALL_COLOR,   
         entity_type = .Paddle,        
         visible     = true,
+        id          = PADDLE_IDX
     }
 
 
@@ -382,7 +389,8 @@ setup_game :: proc() {
             shape_type = .Rectangle,
             color      = ROW_COLORS[row],
             visible    = true,
-            moving     = false,    
+            moving     = false, 
+            id         = i   
         }
 
         // wrap around...
@@ -403,7 +411,8 @@ setup_game :: proc() {
         box        = {min={-10, -10}, max={SCREEN_WIDTH+10, +10}},
         shape_type = .Rectangle, 
         color      = rl.YELLOW,
-        visible    = true
+        visible    = true,
+        id         = WALL_IDX
     }
 
     entities[WALL_IDX + 1] = {
@@ -411,7 +420,8 @@ setup_game :: proc() {
         box        = {min={0, SCREEN_HEIGHT}, max={SCREEN_WIDTH, SCREEN_HEIGHT+10}},
         shape_type = .Rectangle,
         color      = rl.YELLOW,
-        visible    = true
+        visible    = true,
+        id         = WALL_IDX+1   
     }
 
     entities[WALL_IDX + 2] = {
@@ -419,7 +429,8 @@ setup_game :: proc() {
         box        = {min={SCREEN_WIDTH-10, -10}, max={SCREEN_WIDTH+10, SCREEN_HEIGHT+10}},
         shape_type = .Rectangle, 
         color      = rl.YELLOW,
-        visible    = true
+        visible    = true,
+        id         = WALL_IDX+2
     }
 
     entities[WALL_IDX + 3] = {
@@ -427,7 +438,8 @@ setup_game :: proc() {
         box        = {min={-10, -10}, max={+10, SCREEN_HEIGHT+10}},
         shape_type = .Rectangle, 
         color      = rl.YELLOW,
-        visible    = true
+        visible    = true,
+        id         = WALL_IDX+3
     }
 }
 
