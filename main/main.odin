@@ -1,6 +1,7 @@
 package main
 
 import       "core:fmt"
+import       "core:os"
 import       "core:math"
 import       "core:math/linalg"
 import       "core:time"
@@ -171,8 +172,9 @@ update_game :: proc () {
 
     ////////////////////////////////////////////////////////////////////////////
     // collision detection in two phases
-    // 1. determine which entities collide 
-    // 2. Get more information about the collisions
+    // 1. broad phase where we determine if two entities are close enough to collide
+    //    do we need some sort of hashing? or tile map?  Maybe use an array of index tuples?
+    // 2. narrow phase where we actually determine if a collision occurs
     // 3. Update the physics in response to a collision 
 
     //for i in 0..<NUM_ENTITIES {
@@ -464,6 +466,8 @@ draw_game :: proc() {
     }
 }
 
+hash := SpatialHash{}
+
 main :: proc() {
     stopwatch : time.Stopwatch
 
@@ -484,4 +488,6 @@ main :: proc() {
         time.stopwatch_reset(&stopwatch)
     }
 
+    test_read()
 }
+
