@@ -2,99 +2,94 @@ package main
 
 import "core:fmt"
 import "core:mem"
+import "core:math"
 
-Node :: struct {
-	value:  u16,
-	next : ^Node
-}
+//Node :: struct {
+//	value:  u16,
+//	next : ^Node
+//}
 
-List :: struct {
-	head : ^Node,
-	count: u8
-}
+//List :: struct {
+//	head : ^Node,
+//	count: u8
+//}
 
-prepend :: proc(list: ^List, x: u16) {
-	node := new(Node)
-	node.value = x 
+//prepend :: proc(list: ^List, x: u16) {
+//	node := new(Node)
+//	node.value = x 
+//
+//	node.next = list.head 
+//	list.head = node 
+//	list.count += 1 
+//
+//}
 
-	node.next = list.head 
-	list.head = node 
-	list.count += 1 
+//walk :: proc(list: List) {
+//	ptr := list.head
+//	for i in 0..<list.count {
+//		fmt.println(ptr^.value)
+//		ptr = ptr.next
+//	}
+//}
 
-}
+//SpatialHash :: struct {
+//	pixel_dims : [2] f32,
+//	tile_dims  : [2] u32,      
+//}
 
-walk :: proc(list: List) {
-	ptr := list.head
-	for i in 0..<list.count {
-		fmt.println(ptr^.value)
-		ptr = ptr.next
-	}
-}
+//hash_coords:: proc (hash: SpatialHash, x, y: f32) -> (int, int) {
+//	return int(math.ceil(x / f32(hash.width))), int(math.ceil(y / f32(hash.height)))	
+//}
 
-SpatialHash :: struct {
-	width, height: int,
-}
+//NUM_TILES_X :: 20 
+//NUM_TILES_Y :: 20 
+//NUM_TILES   :: NUM_TILES_Y * NUM_TILES_X
 
-hash_coords:: proc (hash: SpatialHash, x, y: f32) -> (int, int) {
-	return int(x / f32(hash.width)), int(y / f32(hash.height))	
-}
+//HashTable :: distinct [NUM_TILES] [dynamic] int
+//hash := SpatialHash {16, 16}
 
-NUM_TILES_X :: 10 
-NUM_TILES_Y :: 10 
-NUM_TILES   :: NUM_TILES_Y * NUM_TILES_X
-
-HashTable :: distinct [NUM_TILES] [dynamic] int
-hash := SpatialHash {16, 16}
-
-hash_entity :: proc (tbl: ^HashTable, id: int, min_x, min_y, max_x, max_y: f32) {
-
-	i0, j0 := hash_coords(hash, min_x, min_y)
-	i1, j1 := hash_coords(hash, max_x, min_y)
-	i2, j2 := hash_coords(hash, max_x, max_y)
-	i3, j3 := hash_coords(hash, min_x, max_y)
-
-	k0 := j0 + i0*NUM_TILES_Y
-	k1 := j1 + i1*NUM_TILES_Y
-	k2 := j2 + i2*NUM_TILES_Y
-	k3 := j3 + i3*NUM_TILES_Y
-
-	append(&tbl[k0], id)
-	append(&tbl[k1], id)
-	append(&tbl[k2], id)
-	append(&tbl[k3], id)
-
-}
+//hash_entity :: proc (tbl: ^HashTable, id: int, min, max : [2]f32) {
+//
+//	i0, j0 := hash_coords(hash, min.x, min.y)
+//	i1, j1 := hash_coords(hash, max.x, max.y)
+//
+//	fmt.println(i0, j0)
+//	fmt.println(i1, j1)
+//	for i in i0..=i1 {
+//		for j in j0..=j1 {
+//			k := j + i*NUM_TILES_Y
+//			append(&tbl[k], id)
+//
+//		}
+//	}
+//
+//}
 
 main :: proc() {
 	//hash := SpatialHash{10, 10}
 
-	tbl : HashTable
+	//tbl : HashTable
 
-	hash_entity(&tbl, 3, 32.0, 35.0, 59.0, 60.0) 
+	//hash_entity(&tbl, 3, {32.0, 35.0}, {56.0, 60.0}) 
 
-	for i in 0..<len(tbl) {
-		if tbl[i] != nil { 
-			fmt.println(i, tbl[i])
-		}
+	//for i in 0..<len(tbl) {
+	//	if tbl[i] != nil { 
+	//		fmt.println(i, tbl[i])
+	//	}
+	//}
+
+	foo :: proc() -> [dynamic] u16 {
+		x := [dynamic] u16{1,2}
+		return x
 	}
 
-	for i in 0..<len(tbl) {
-		tbl[i] = nil
-	}
+	aa := foo()
 
-	for i in 0..<len(tbl) {
-		if tbl[i] != nil { 
-			fmt.println(i, tbl[i])
-		}
-	}
+	fmt.println(uintptr(&aa[0]), uintptr(&aa[1]))
+	fmt.println(cap(aa))
+	append(&aa, 6,8,9)
 
-	x : [dynamic] int = {1,2,3,4,5}
-	for xi, i in x {
-		fmt.println(xi)
-		fmt.println("----")
-		for xj, j in x[i+1:] {
-			fmt.println(xj)
-		}
-	}
-	//fmt.println(hash_coords(&hash, 10.3, 43.0))
+	fmt.println(uintptr(&aa[0]), uintptr(&aa[1]), uintptr(&aa[2]), uintptr(&aa[3]), uintptr(&aa[4]))
+	fmt.println(cap(aa))
+
 }
