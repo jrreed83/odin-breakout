@@ -9,52 +9,61 @@ import rl    "vendor:raylib"
 import libc  "core:c/libc"
 
 
+// @TODO: Determine the processor speed programatically
+PROCESSOR_HZ     :: 2_420_000_000
 SCREEN_WIDTH     :: 850
 SCREEN_HEIGHT    :: 650
-FRAME_RATE       :: 60
-UPDATE_RATE      :: FRAME_RATE / 2
-REFRESH_TIME     :  time.Duration : time.Duration(16*time.Millisecond)
+//FRAME_RATE       :: 60
+//UPDATE_RATE      :: FRAME_RATE / 2
+//REFRESH_TIME     :  time.Duration : time.Duration(16*time.Millisecond)
 
 BACKGROUND_COLOR :: rl.BLACK 
 
-PADDLE_COLOR     :: rl.RED
-PADDLE_WIDTH     :: 60  
-PADDLE_HEIGHT    :: 60
-PADDLE_MIN_X     :: 0.5*(SCREEN_WIDTH - PADDLE_WIDTH)    
-PADDLE_MIN_Y     :: 500 //600
-PADDLE_MAX_X     :: PADDLE_MIN_X + PADDLE_WIDTH 
-PADDLE_MAX_Y     :: PADDLE_MIN_Y + PADDLE_HEIGHT
-PADDLE_CENTER_X  :: 0.5*(PADDLE_MIN_X + PADDLE_MAX_X)
+//PADDLE_COLOR     :: rl.RED
+//PADDLE_WIDTH     :: 60  
+//PADDLE_HEIGHT    :: 60
+//PADDLE_MIN_X     :: 0.5*(SCREEN_WIDTH - PADDLE_WIDTH)    
+//PADDLE_MIN_Y     :: 500 //600
+//PADDLE_MAX_X     :: PADDLE_MIN_X + PADDLE_WIDTH 
+//PADDLE_MAX_Y     :: PADDLE_MIN_Y + PADDLE_HEIGHT
+//PADDLE_CENTER_X  :: 0.5*(PADDLE_MIN_X + PADDLE_MAX_X)
 
-PADDLE_SPEED     :: 100
+//PADDLE_SPEED     :: 100
 
-BALL_COLOR       :: rl.WHITE
-BALL_RADIUS      :: 5
-BALL_MIN_X       :: PADDLE_CENTER_X - BALL_RADIUS -5 - PADDLE_MIN_X
-BALL_MAX_X       :: BALL_MIN_X + 2*BALL_RADIUS 
-BALL_MIN_Y       :: PADDLE_MIN_Y - 10*BALL_RADIUS +50
-BALL_MAX_Y       :: BALL_MIN_Y + 2*BALL_RADIUS
+//BALL_COLOR       :: rl.WHITE
+//BALL_RADIUS      :: 5
+//BALL_MIN_X       :: PADDLE_CENTER_X - BALL_RADIUS -5 - PADDLE_MIN_X
+//BALL_MAX_X       :: BALL_MIN_X + 2*BALL_RADIUS 
+//BALL_MIN_Y       :: PADDLE_MIN_Y - 10*BALL_RADIUS +50
+//BALL_MAX_Y       :: BALL_MIN_Y + 2*BALL_RADIUS
 
-BALL_SPEED       :: 300
+//BALL_SPEED       :: 300
 
-BRICK_HEIGHT   :: 25
-BRICK_WIDTH    :: 45 
+//BRICK_HEIGHT   :: 25
+//BRICK_WIDTH    :: 45 
 
-BONUS_HEIGHT   :: 15
-BONUS_WIDTH    :: BRICK_WIDTH
+//BONUS_HEIGHT   :: 15
+//BONUS_WIDTH    :: BRICK_WIDTH
 
-GRID_NUM_ROWS  :: 6 
-GRID_NUM_COLS  :: 10 
-NUM_BRICKS     :: GRID_NUM_COLS * GRID_NUM_ROWS
-BRICK_SPACING  :: 10
-GRID_PADDING_Y :: 50
-GRID_PADDING_X :: 0.5*(SCREEN_WIDTH - BRICK_WIDTH * GRID_NUM_COLS - BRICK_SPACING * (GRID_NUM_COLS-1))
+//GRID_NUM_ROWS  :: 6 
+//GRID_NUM_COLS  :: 10 
+//NUM_BRICKS     :: GRID_NUM_COLS * GRID_NUM_ROWS
+//BRICK_SPACING  :: 10
+//GRID_PADDING_Y :: 50
+//GRID_PADDING_X :: 0.5*(SCREEN_WIDTH - BRICK_WIDTH * GRID_NUM_COLS - BRICK_SPACING * (GRID_NUM_COLS-1))
 
-dt: f32 = 1.0 / UPDATE_RATE
+FRAMES_PER_SECOND  :: 60
+UPDATES_PER_SECOND :: 30
 
-friction :f32 = 1.0 
+//UPDATES_PER_SECOND :: 4 * FRAMES_PER_SECOND
 
-score:= 0
+DT: f32 : 1.0 / f32(UPDATES_PER_SECOND)
+
+DT_SQUARED :: DT * DT
+
+//friction :f32 = 1.0 
+
+//score:= 0
 
 
 EntityType :: enum u8 {
@@ -67,12 +76,18 @@ EntityType :: enum u8 {
 
 
 bounding_box :: proc (e: Entity) -> (min: [2] f32, max: [2] f32) {
-    half :[2]f32 = 0.5*{e.width, e.height}
 
-    min = e.pos - half 
-    max = e.pos + half
+    min = e.pos
+    max = e.pos + {f32(e.width), f32(e.height)}
 
     return min, max
+}
+
+centroid :: proc(e: Entity) -> [2] f32 {
+    cx := e.pos.x + 0.5*e.width 
+    cy := e.pos.y + 0.5*e.height
+
+    return {cx, cy}
 }
 
 paused := false 
@@ -86,6 +101,7 @@ Entity :: struct {
     visible: bool,   
     health:  u8,
     moving:  bool,
+    bouncy:  bool,
     drag:    f32,
 
     acc: [2] f32,
@@ -97,6 +113,9 @@ Entity :: struct {
     height: f32,
     width:  f32, 
 
+    path: cstring,
+
+    texture: rl.Texture 
 }
 
 
@@ -105,7 +124,7 @@ BALL_IDX     :: 0
 PADDLE_IDX   :: 1 
 WALL_IDX     :: 2 
 BRICK_IDX    :: WALL_IDX + 4
-NUM_ENTITIES :: 1 // BRICK_IDX + 60
+NUM_ENTITIES :: 56 // BRICK_IDX + 60
 
 
 entities : [NUM_ENTITIES] Entity
@@ -126,6 +145,8 @@ update_game :: proc () {
 
     if paused { return }
 
+    // @TODO: add a start button 
+
     // @TODO: change to force and derive acceleration
     //if rl.IsKeyDown(.LEFT) {
     //    entities[PADDLE_IDX].acc.x = -1000
@@ -144,46 +165,58 @@ update_game :: proc () {
 
         if entity.moving {
             entity.acc += -entity.drag*entity.vel 
-            entity.vel +=  entity.acc*dt
-            entity.pos +=  entity.vel*dt + 0.5*entity.acc * square(dt)     
+            entity.vel +=  entity.acc*DT
+            entity.pos +=  entity.vel*DT + 0.5*entity.acc * DT_SQUARED     
         }
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // b
-//    for i in 0..<NUM_ENTITIES {
-//        hash_entity(&spatial_hash_tbl, entities[i])
-//    }
-//
-//    for i in 0..<NUM_ENTITIES {
-//        entity := &entities[i]
-//         
-//        close_entity_ids := get_close_entities(&spatial_hash_tbl, id=i, distance=1)
-//         
-//        for j in close_entity_ids {
-//            handle_collision(entity, &entities[j]) //            
-//        }
-//    }
+    // collisions
+
+    // @TODO: Add spatial hash for more efficient collision detection
+    // @TODO: Check location of collision to determine deflection
+    // @TODO: Integrate life time?
+    for i in 0..<NUM_ENTITIES {
+        ei := &entities[i]
+        for j in 0..<NUM_ENTITIES {
+            ej := &entities[j]
+
+            if i != j && ei.moving && ej.visible {
+                mini, maxi := bounding_box(ei^)
+                c := centroid(ei^)
+        
+                minj, maxj := bounding_box(ej^)
+
+                dx := 0.5*ei.width
+                dy := 0.5*ei.height 
+                if minj.x-dx <= c.x && c.x <= maxj.x+dx && minj.y-dy <= c.y && c.y <= maxj.y+dy {
+                    if ei.type == .Ball && ej.type == .Brick {
+                        ej.visible = false 
+
+                        ei.vel.y = -ei.vel.y
+                    }
+                }
+            }
+
+        }
+    }
     
     // Wall collision 
     for i in 0..<NUM_ENTITIES {
+        // @TODO: Minkowski sum collision?
         entity := &entities[i]
 
         min, max := bounding_box(entity^)
-        if min.x <= 0 {
-            entity.vel.x = -entity.vel.x
-        } 
 
-        if max.x >= SCREEN_WIDTH {
-            entity.vel.x = -entity.vel.x
-        } 
+        if entity.bouncy {
+            if min.x <= 0 || max.x >= SCREEN_WIDTH {
+                entity.vel.x = -entity.vel.x
+            } 
 
-        if min.y <= 0 {
-            entity.vel.y = -entity.vel.y
-        }
+            if min.y <= 0 || max.y >= SCREEN_HEIGHT{
+                entity.vel.y = -entity.vel.y
+            }
 
-        if max.y >= SCREEN_HEIGHT {
-            entity.vel.y = -entity.vel.y
         }
     }
 
@@ -202,13 +235,50 @@ setup_game :: proc() {
         moving   = true,
         drag     = 0.0,
         acc      = {0.0,0.0},
-        vel      = {34.0,100.0},
-        height   = 10.0,
-        width    = 10.0,
-        color    = BALL_COLOR,
-        pos      = {100, 100}
+        vel      = {0.0,40.0},
+        pos      = {SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2},
+        bouncy   = true,
+        path     = "ball.png",
+        height   = 10,
+        width    = 10,
+        color    = rl.GREEN
     }
 
+
+    xpos: f32 = 10
+    ypos: f32 = 50
+    row := 0
+    col := 0
+    for i in 1..<NUM_ENTITIES {
+
+        entities[i] = {
+            id       = i,
+            type     = .Brick,
+            visible  = true,
+            moving   = false,
+            drag     = 0.0,
+            pos      = {xpos, ypos},
+            bouncy   = false,
+            height   = 30,
+            width    = 60,
+            color    = rl.PINK
+        }
+
+        xpos += 65
+        col  += 1
+        if xpos > SCREEN_WIDTH {
+            xpos  = 10
+            ypos += 35
+            row  += 1 
+            col   = 0
+        }
+    }
+
+    //for i in 0..<NUM_ENTITIES {
+    //    entity := &entities[i]
+    //
+    //    entity.texture = rl.LoadTexture(entity.path)
+    //}
     // paddle ...
     //entities[PADDLE_IDX] = {
     //    box     = {min={PADDLE_MIN_X, PADDLE_MIN_Y}, max={PADDLE_MAX_X, PADDLE_MAX_Y}},
@@ -285,9 +355,18 @@ setup_game :: proc() {
 }
 
 draw_entity :: proc(entity: ^Entity) {
-    cx, cy := i32(entity.pos.x), i32(entity.pos.y)
-    radius := 0.5*entity.height 
-    rl.DrawCircle(cx, cy, radius, entity.color)
+    x, y := entity.pos.x, entity.pos.y
+
+    rl.DrawRectangle(
+        i32(entity.pos.x), 
+        i32(entity.pos.y),
+        i32(entity.width),
+        i32(entity.height),
+        entity.color
+    )
+    //rl.DrawTexture(entity.texture, i32(x), i32(y), rl.WHITE)
+    
+
 //    if entity.shape == .Circle {
 //        c := bounding_box_center(entity)
 //        r := bounding_box_radii(entity)
@@ -305,43 +384,72 @@ draw_entity :: proc(entity: ^Entity) {
 
 //ROW_COLORS : [6] rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
 
-draw_game :: proc() {
-    
-    rl.BeginDrawing()
-    defer rl.EndDrawing()
-
-    rl.ClearBackground(BACKGROUND_COLOR)
-
-    //rl.DrawText(rl.TextFormat("Score: %d", score), 40, 40, 20, rl.WHITE)
-
-    for i in 0..<NUM_ENTITIES {
-        entity := &entities[i]
-        if entity.visible {
-            draw_entity(entity)
-        }
-    }
-}
 
 //hash := SpatialHash{}
 
 main :: proc() {
-    stopwatch : time.Stopwatch
 
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
     defer rl.CloseWindow() 
 
     setup_game()
  
-    for !rl.WindowShouldClose() {
-    
-        //time.stopwatch_start(&stopwatch)
-        update_game()
-        //time.stopwatch_stop(&stopwatch)
-        time.sleep(REFRESH_TIME - stopwatch._accumulation)
+    // @TODO: eliminate this
+    // Running way faster so that we can test my timing routine
+    rl.SetTargetFPS(120)
 
-        draw_game()
+    N := 0
+
+    cnt : u64 
+
+    prev_tick := time.read_cycle_counter() 
+    curr_tick := prev_tick
+    
+    // @TODO: Make this a compile time constant?
+    counts_per_frame := u64(PROCESSOR_HZ * 15e-3)
+
+    for !rl.WindowShouldClose() {
         
-        //time.stopwatch_reset(&stopwatch)
+        ///////////////////////////////////////////////////////////////////////
+        // Update the physics
+        //
+        update_game() 
+
+        ///////////////////////////////////////////////////////////////////////
+        // Rendering: 
+        //   
+
+        // Wait until it's time to paint the frame.  This makes sure that
+        // there's a fairly precise amount of time between refresh times
+        // @TODO: is 10 microseconds of sleeping sufficient.  
+        // Definitely need some
+        // sleeping, otherwise the computer fans are put to work
+        for time.read_cycle_counter() - prev_tick < counts_per_frame {  
+            time.sleep(10*time.Microsecond)
+        }
+    
+        // @TODO: Investigate BeginDrawing, ClearBackground, and EndDrawing
+        rl.BeginDrawing() 
+        rl.ClearBackground(BACKGROUND_COLOR)
+
+        for i in 0..<NUM_ENTITIES {
+            entity := &entities[i]
+            if entity.visible {
+                draw_entity(entity)
+            }
+        }
+        rl.EndDrawing()
+
+        //////////////////////////////////////////////////////////////////////
+        // Check that we're hitting the frame rate
+        // @TODO: add a compile time flag to enablee/disable framerate timing
+        curr_tick = time.read_cycle_counter() 
+        fmt.printf("%.6f\n", f32(curr_tick - prev_tick) / f32(PROCESSOR_HZ))
+        prev_tick = curr_tick
+        //////////////////////////////////////////////////////////
+        
     }
+
+    
 }
 
