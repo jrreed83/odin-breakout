@@ -61,9 +61,8 @@ DT: f32 : 1.0 / f32(UPDATES_PER_SECOND)
 
 DT_SQUARED :: DT * DT
 
-//friction :f32 = 1.0 
 
-//score:= 0
+score:= 0
 
 
 EntityType :: enum u8 {
@@ -75,7 +74,7 @@ EntityType :: enum u8 {
 
 
 
-bounding_box :: proc (e: Entity) -> (min: [2] f32, max: [2] f32) {
+bounding_box :: proc (e: ^Entity) -> (min: [2] f32, max: [2] f32) {
 
     min = e.pos
     max = e.pos + {f32(e.width), f32(e.height)}
@@ -83,26 +82,27 @@ bounding_box :: proc (e: Entity) -> (min: [2] f32, max: [2] f32) {
     return min, max
 }
 
-centroid :: proc(e: Entity) -> [2] f32 {
+centroid :: proc(e: ^Entity) -> [2] f32 {
     cx := e.pos.x + 0.5*e.width 
     cy := e.pos.y + 0.5*e.height
 
     return {cx, cy}
 }
 
-paused := false 
+paused := true
 
+// @TODO: What about gravitational force?
 Entity :: struct {
     id: int,
 
     type: EntityType,
     
-    mass:    f32,
-    visible: bool,   
-    health:  u8,
-    moving:  bool,
-    bouncy:  bool,
-    drag:    f32,
+    mass:     f32,
+    visible:  bool,   
+    health:   u8,
+    mobile:   bool,
+    bouncy:   bool,
+    airdrag:  f32,
 
     acc: [2] f32,
     vel: [2] f32,
@@ -115,15 +115,15 @@ Entity :: struct {
 
     path: cstring,
 
-    texture: rl.Texture 
+    texture: rl.Texture,
+
+    // @TODO: too specific to bricks, 
+    row: int,
+    col: int 
 }
 
 
 // @TODO: want a single array of entities, indices to separate types of entities into groups
-BALL_IDX     :: 0 
-PADDLE_IDX   :: 1 
-WALL_IDX     :: 2 
-BRICK_IDX    :: WALL_IDX + 4
 NUM_ENTITIES :: 56 // BRICK_IDX + 60
 
 
@@ -145,16 +145,17 @@ update_game :: proc () {
 
     if paused { return }
 
-    // @TODO: add a start button 
+    // @TODO: add a start button?
+    
 
     // @TODO: change to force and derive acceleration
-    //if rl.IsKeyDown(.LEFT) {
-    //    entities[PADDLE_IDX].acc.x = -1000
-    //} else if rl.IsKeyDown(.RIGHT) {
-    //    entities[PADDLE_IDX].acc.x = +1000
-    //} else {
-    //    entities[PADDLE_IDX].acc.x = 0
-    //}
+    if rl.IsKeyDown(.LEFT) {
+        entities[1].acc.x = -1000
+    } else if rl.IsKeyDown(.RIGHT) {
+        entities[1].acc.x = +1000
+    } else {
+        entities[1].acc.x = 0
+    }
 
     
     ////////////////////////////////////////////////////////////////////////////
@@ -163,8 +164,8 @@ update_game :: proc () {
     for i in 0..<NUM_ENTITIES {
         entity := &entities[i]
 
-        if entity.moving {
-            entity.acc += -entity.drag*entity.vel 
+        if entity.mobile {
+            entity.acc += -entity.airdrag*entity.vel 
             entity.vel +=  entity.acc*DT
             entity.pos +=  entity.vel*DT + 0.5*entity.acc * DT_SQUARED     
         }
@@ -177,23 +178,94 @@ update_game :: proc () {
     // @TODO: Check location of collision to determine deflection
     // @TODO: Integrate life time?
     for i in 0..<NUM_ENTITIES {
-        ei := &entities[i]
+        trial_entity := &entities[i]
+
         for j in 0..<NUM_ENTITIES {
-            ej := &entities[j]
+            test_entity := &entities[j]
+            
+            if i != j && trial_entity.mobile && test_entity.visible {
+                
+                trial_min, trial_max := bounding_box(trial_entity)
+                trial_centroid := centroid(trial_entity)
 
-            if i != j && ei.moving && ej.visible {
-                mini, maxi := bounding_box(ei^)
-                c := centroid(ei^)
-        
-                minj, maxj := bounding_box(ej^)
+                test_min, test_max := bounding_box(test_entity)
 
-                dx := 0.5*ei.width
-                dy := 0.5*ei.height 
-                if minj.x-dx <= c.x && c.x <= maxj.x+dx && minj.y-dy <= c.y && c.y <= maxj.y+dy {
-                    if ei.type == .Ball && ej.type == .Brick {
-                        ej.visible = false 
 
-                        ei.vel.y = -ei.vel.y
+                dx := 0.5*trial_entity.width
+                dy := 0.5*trial_entity.height
+
+                min_x := test_min.x - dx 
+                max_x := test_max.x + dx 
+
+                min_y := test_min.y - dy 
+                max_y := test_max.y + dy
+
+                cx := trial_centroid.x 
+                cy := trial_centroid.y 
+
+                if min_x <= cx && cx <= max_x && min_y <= cy && cy <= max_y {
+                    if trial_entity.type == .Ball && test_entity.type == .Brick {
+
+                        // @TODO: Migrate from `visible` to something related to alive or lifetime
+                        test_entity.visible = false
+
+                        // @TODO: This is way too specific
+                        score += (6 - test_entity.row)*10
+
+                        fmt.println(score)      
+                        // @TODO: Revisit this edge detection scheme.  Want to use a predictive/continuous collision detection approach
+
+
+                        // Determine which edge the ball most likely hit.  Based on distance
+                        d0 := cx - min_x 
+                        d1 := max_x - cx
+                        d2 := cy - min_y 
+                        d3 := max_y - cy
+
+                        // @TODO: Apply force rather than velocity?
+                        if d0 <= d1 && d0 <= d2 && d0 <= d3 {
+                            // left edge 
+                            trial_entity.vel.x = -trial_entity.vel.x 
+                        } else if d1 <= d0 && d1 <= d2 && d1 <= d3 {
+                            // right edge 
+                            trial_entity.vel.x = -trial_entity.vel.x 
+                        } else if d2 <= d0 && d2 <= d1 && d2 <= d3 {
+                            // top edge 
+                            trial_entity.vel.y = -trial_entity.vel.y
+
+                        } else {
+                            // bottom edge
+                            trial_entity.vel.y = -trial_entity.vel.y
+                        }
+                    }
+
+                    if trial_entity.type == .Ball && test_entity.type == .Paddle {
+
+
+                        // @TODO: Revisit this edge detection scheme.  Want to use a predictive/continuous collision detection approach
+
+
+                        // Determine which edge the ball most likely hit.  Based on distance
+                        d0 := cx - min_x 
+                        d1 := max_x - cx
+                        d2 := cy - min_y 
+                        d3 := max_y - cy
+
+                        // @TODO: Apply force rather than velocity?
+                        if d0 <= d1 && d0 <= d2 && d0 <= d3 {
+                            // left edge 
+                            trial_entity.vel.x = -trial_entity.vel.x 
+                        } else if d1 <= d0 && d1 <= d2 && d1 <= d3 {
+                            // right edge 
+                            trial_entity.vel.x = -trial_entity.vel.x 
+                        } else if d2 <= d0 && d2 <= d1 && d2 <= d3 {
+                            // top edge 
+                            trial_entity.vel.y = -trial_entity.vel.y
+                            trial_entity.vel.x += 0.5*test_entity.vel.x
+                        } else {
+                            // bottom edge
+                            trial_entity.vel.y = -trial_entity.vel.y
+                        }
                     }
                 }
             }
@@ -206,17 +278,37 @@ update_game :: proc () {
         // @TODO: Minkowski sum collision?
         entity := &entities[i]
 
-        min, max := bounding_box(entity^)
+        min, max := bounding_box(entity)
 
         if entity.bouncy {
             if min.x <= 0 || max.x >= SCREEN_WIDTH {
                 entity.vel.x = -entity.vel.x
             } 
 
-            if min.y <= 0 || max.y >= SCREEN_HEIGHT{
+            if min.y <= 0 {
                 entity.vel.y = -entity.vel.y
             }
 
+            if max.y >= SCREEN_HEIGHT {
+
+
+            }
+
+
+
+        }
+
+        if entity.type == .Paddle {
+            // @TODO: Should this just be clipping?
+            if min.x <= 0 {
+                entity.pos.x = 0
+            } else if max.x >= SCREEN_WIDTH {
+                entity.pos.x = SCREEN_WIDTH - entity.width
+            } else if min.x <= 0 {
+                entity.pos.y = 0
+            } else if max.y >= SCREEN_HEIGHT {
+                entity.pos.y = SCREEN_HEIGHT - entity.height
+            }
         }
     }
 
@@ -228,130 +320,82 @@ update_game :: proc () {
 
 setup_game :: proc() {
     // ball ...
+    ball_diameter := f32(10)
+    ball_pos_x    := f32(SCREEN_WIDTH / 2 - ball_diameter/2)    
+    ball_pos_y    := f32(SCREEN_HEIGHT - 75)
     entities[0] = {
         id       = 0,
         type     = .Ball,
         visible  = true,
-        moving   = true,
-        drag     = 0.0,
+        mobile   = true,
+        airdrag  = 0.0,
         acc      = {0.0,0.0},
-        vel      = {0.0,40.0},
-        pos      = {SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2},
+        vel      = {0.0,-40.0},
+        pos      = {ball_pos_x, ball_pos_y},
         bouncy   = true,
-        path     = "ball.png",
-        height   = 10,
-        width    = 10,
+        height   = f32(ball_diameter),
+        width    = f32(ball_diameter),
         color    = rl.GREEN
     }
 
+    // paddle 
+    paddle_width := 100 
+    paddle_pos_x := f32(SCREEN_WIDTH / 2 - paddle_width/2)
+    entities[1] = {
+        id       = 0,
+        type     = .Paddle,
+        visible  = true,
+        mobile   = true,
+        airdrag  = 5.0,
+        acc      = {0.0,0.0},
+        vel      = {0.0,0.0},
+        pos      = {paddle_pos_x, f32(ball_pos_y + ball_diameter)},
+        bouncy   = false,
+        path     = "ball.png",
+        height   = 20,
+        width    = 100,
+        color    = rl.GREEN
+    }
 
-    xpos: f32 = 10
-    ypos: f32 = 50
+    // @TODO: Improve way the grid is set up, including the units
+
     row := 0
     col := 0
-    for i in 1..<NUM_ENTITIES {
+
+    height := f32(30)
+    width  := f32(60) 
+    space  := f32(5) 
+
+    grid_width := 9 * width + 8 * space
+    grid_min_x := (f32(SCREEN_WIDTH) - f32(grid_width)) / 2 
+
+    xpos: f32 = grid_min_x
+    ypos: f32 = 50
+
+    for i in 2..<56 {
 
         entities[i] = {
             id       = i,
             type     = .Brick,
             visible  = true,
-            moving   = false,
-            drag     = 0.0,
+            mobile   = false,
             pos      = {xpos, ypos},
-            bouncy   = false,
-            height   = 30,
-            width    = 60,
-            color    = rl.PINK
+            height   = f32(height),
+            width    = f32(width),
+            color    = rl.PINK,
+            row      = row,
         }
 
-        xpos += 65
+        xpos += width + space
         col  += 1
-        if xpos > SCREEN_WIDTH {
-            xpos  = 10
-            ypos += 35
+        if col == 9 {
+            xpos  = grid_min_x
+            ypos += height+space
             row  += 1 
             col   = 0
         }
     }
 
-    //for i in 0..<NUM_ENTITIES {
-    //    entity := &entities[i]
-    //
-    //    entity.texture = rl.LoadTexture(entity.path)
-    //}
-    // paddle ...
-    //entities[PADDLE_IDX] = {
-    //    box     = {min={PADDLE_MIN_X, PADDLE_MIN_Y}, max={PADDLE_MAX_X, PADDLE_MAX_Y}},
-    //    shape   = .Rectangle,
-    //    color   = BALL_COLOR,   
-    //    type    = .Paddle,        
-    //    visible = true,
-    //    id      = PADDLE_IDX
-    //}
-
-
-    // bricks ...
-    //brick_min: [2] f32 = {GRID_PADDING_X, GRID_PADDING_Y}
-    //row, col := 0, 0
-    //
-    //for i in BRICK_IDX..<BRICK_IDX+60 {
-    //    entities[i] = {
-    //        box        = {min = brick_min, max = brick_min + {BRICK_WIDTH, BRICK_HEIGHT}},
-    //        shape = .Rectangle,
-    //        color      = ROW_COLORS[row],
-    //        visible    = true,
-    //        moving     = false, 
-    //        id         = i   
-    //    }
-
-        // wrap around...
-    //    if col == 9 {
-    //        brick_min.x = GRID_PADDING_X
-    //        brick_min.y = brick_min.y + BRICK_SPACING + BRICK_HEIGHT 
-    //        col = 0
-    //        row = row+1
-    //    } else {
-    //       brick_min.x   = brick_min.x + BRICK_SPACING + BRICK_WIDTH
-    //        col += 1
-    //    }
-    //}
-
-    // walls ...
-    //entities[WALL_IDX + 0] = {   
-        // TOP / NORTH
-    //    box     = {min={-10, -10}, max={SCREEN_WIDTH+10, +10}},
-    //    shape   = .Rectangle, 
-    //    color   = rl.YELLOW,
-    //    visible = true,
-    //    id      = WALL_IDX
-    //}
-
-    //entities[WALL_IDX + 1] = {
-        // BOTTOM / SOUTH
-    //    box      = {min={0, SCREEN_HEIGHT}, max={SCREEN_WIDTH, SCREEN_HEIGHT+10}},
-    //    shape    = .Rectangle,
-    //    color    = rl.YELLOW,
-    //    visible  = true,
-    //    id       = WALL_IDX+1   
-    //}
-
-    //entities[WALL_IDX + 2] = {
-        // RIGHT / EAST
-    //    box        = {min={SCREEN_WIDTH-10, -10}, max={SCREEN_WIDTH+10, SCREEN_HEIGHT+10}},
-    //    shape = .Rectangle, 
-    //    color      = rl.YELLOW,
-    //    visible    = true,
-    //    id         = WALL_IDX+2
-    //}
-
-//    entities[WALL_IDX + 3] = {
-//        // LEFT / WEST
-//        box        = {min={-10, -10}, max={+10, SCREEN_HEIGHT+10}},
-//        shape = .Rectangle, 
-//        color      = rl.YELLOW,
-//        visible    = true,
-//        id         = WALL_IDX+3
-//    }
 }
 
 draw_entity :: proc(entity: ^Entity) {
@@ -364,28 +408,8 @@ draw_entity :: proc(entity: ^Entity) {
         i32(entity.height),
         entity.color
     )
-    //rl.DrawTexture(entity.texture, i32(x), i32(y), rl.WHITE)
-    
-
-//    if entity.shape == .Circle {
-//        c := bounding_box_center(entity)
-//        r := bounding_box_radii(entity)
-//        rl.DrawCircle(i32(c.x), i32(c.y), r.x, entity.color)
-//    } else {
-//        rl.DrawRectangle(
-//            i32(entity.min.x), 
-//            i32(entity.min.y),
-//            i32(entity.max.x-entity.min.x),
-//            i32(entity.max.y-entity.min.y),
-//            entity.color
- //       )
-//    }         
+     
 }
-
-//ROW_COLORS : [6] rl.Color = {rl.PINK, rl.RED, rl.ORANGE, rl.YELLOW, rl.GREEN, rl.BLUE}
-
-
-//hash := SpatialHash{}
 
 main :: proc() {
 
@@ -430,8 +454,10 @@ main :: proc() {
     
         // @TODO: Investigate BeginDrawing, ClearBackground, and EndDrawing
         rl.BeginDrawing() 
+
         rl.ClearBackground(BACKGROUND_COLOR)
 
+        rl.DrawText(rl.TextFormat("Score: %d", score), 10, SCREEN_HEIGHT - 32, 32, rl.WHITE)
         for i in 0..<NUM_ENTITIES {
             entity := &entities[i]
             if entity.visible {
@@ -442,14 +468,17 @@ main :: proc() {
 
         //////////////////////////////////////////////////////////////////////
         // Check that we're hitting the frame rate
-        // @TODO: add a compile time flag to enablee/disable framerate timing
+        // @TODO: add a compile time flag to enable/disable framerate timing
         curr_tick = time.read_cycle_counter() 
-        fmt.printf("%.6f\n", f32(curr_tick - prev_tick) / f32(PROCESSOR_HZ))
+        //fmt.printf("%.6f\n", f32(curr_tick - prev_tick) / f32(PROCESSOR_HZ))
         prev_tick = curr_tick
         //////////////////////////////////////////////////////////
         
     }
 
-    
+    // Open a level
+    fid, _ := os.open("level_1.txt")
+
+    defer os.close(fid) 
 }
 
