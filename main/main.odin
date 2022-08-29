@@ -6,7 +6,8 @@ import       "core:math"
 import       "core:math/linalg"
 import       "core:time"
 import rl    "vendor:raylib"
-import libc  "core:c/libc"
+//import libc  "core:c/libc"
+import vk    "vendor:vulkan"
 
 
 // @TODO: Determine the processor speed programatically
@@ -118,8 +119,7 @@ Entity :: struct {
     texture: rl.Texture,
 
     // @TODO: too specific to bricks, 
-    row: int,
-    col: int 
+    points: int
 }
 
 
@@ -134,11 +134,69 @@ square :: proc(x: f32) -> f32 {
     return x * x 
 }
 
+lost_game  := false
+lost_turn  := false
+turns_left := 3
+
+colors : []rl.Color = {
+    rl.BLUE, 
+    rl.PURPLE, 
+    rl.PINK, 
+    rl.RED, 
+    rl.ORANGE, 
+    rl.YELLOW}
+
+
 update_game :: proc () {
 
-    // initialize for frame 
     ////////////////////////////////////////////////////////////////////////////
-    // User input 
+    // initialize for frame 
+    //
+    if lost_turn {
+        // @TODO: need to streamline this code, should it go at the end of update?
+        ball_diameter := f32(10)
+        ball_pos_x    := f32(SCREEN_WIDTH / 2 - ball_diameter/2)    
+        ball_pos_y    := f32(SCREEN_HEIGHT - 75)
+        entities[0] = {
+            id       = 0,
+            type     = .Ball,
+            visible  = true,
+            mobile   = true,
+            airdrag  = 0.0,
+            acc      = {0.0,0.0},
+            vel      = {0.0,-40.0},
+            pos      = {ball_pos_x, ball_pos_y},
+            bouncy   = true,
+            height   = f32(ball_diameter),
+            width    = f32(ball_diameter),
+            color    = rl.RAYWHITE
+        }
+
+        // paddle 
+        paddle_width := 100 
+        paddle_pos_x := f32(SCREEN_WIDTH / 2 - paddle_width/2)
+        entities[1] = {
+            id       = 0,
+            type     = .Paddle,
+            visible  = true,
+            mobile   = true,
+            airdrag  = 5.0,
+            acc      = {0.0,0.0},
+            vel      = {0.0,0.0},
+            pos      = {paddle_pos_x, f32(ball_pos_y + ball_diameter)},
+            bouncy   = false,
+            height   = 20,
+            width    = 100,
+            color    = rl.GREEN
+        }
+
+        lost_turn = false
+        paused    = true
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // User input
+    // 
     if rl.IsKeyPressed(.SPACE) {
         paused = !paused
     }
@@ -210,7 +268,7 @@ update_game :: proc () {
                         test_entity.visible = false
 
                         // @TODO: This is way too specific
-                        score += (6 - test_entity.row)*10
+                        score += test_entity.points
 
                         fmt.println(score)      
                         // @TODO: Revisit this edge detection scheme.  Want to use a predictive/continuous collision detection approach
@@ -290,8 +348,13 @@ update_game :: proc () {
             }
 
             if max.y >= SCREEN_HEIGHT {
+                lost_turn = true 
+                turns_left -= 1
 
-
+                if turns_left == 0 {
+                    lost_game = true
+                    score = 0
+                } 
             }
 
 
@@ -311,10 +374,6 @@ update_game :: proc () {
             }
         }
     }
-
-
-
-
 }
 
 
@@ -335,7 +394,7 @@ setup_game :: proc() {
         bouncy   = true,
         height   = f32(ball_diameter),
         width    = f32(ball_diameter),
-        color    = rl.GREEN
+        color    = rl.RAYWHITE
     }
 
     // paddle 
@@ -382,8 +441,8 @@ setup_game :: proc() {
             pos      = {xpos, ypos},
             height   = f32(height),
             width    = f32(width),
-            color    = rl.PINK,
-            row      = row,
+            color    = colors[row],
+            points   = 10*(6-row),
         }
 
         xpos += width + space
@@ -411,6 +470,8 @@ draw_entity :: proc(entity: ^Entity) {
      
 }
 
+turns : int = 3 
+
 main :: proc() {
 
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BreakOut")
@@ -420,7 +481,7 @@ main :: proc() {
  
     // @TODO: eliminate this
     // Running way faster so that we can test my timing routine
-    rl.SetTargetFPS(120)
+    rl.SetTargetFPS(240)
 
     N := 0
 
@@ -457,7 +518,8 @@ main :: proc() {
 
         rl.ClearBackground(BACKGROUND_COLOR)
 
-        rl.DrawText(rl.TextFormat("Score: %d", score), 10, SCREEN_HEIGHT - 32, 32, rl.WHITE)
+        rl.DrawText(rl.TextFormat("Score: %d", score), 10, SCREEN_HEIGHT - 32, 32, rl.RAYWHITE)
+        rl.DrawText(rl.TextFormat("Turns Left: %d", turns_left), 500, SCREEN_HEIGHT - 32, 32, rl.RAYWHITE)
         for i in 0..<NUM_ENTITIES {
             entity := &entities[i]
             if entity.visible {
