@@ -152,48 +152,33 @@ update_game :: proc () {
     ////////////////////////////////////////////////////////////////////////////
     // initialize for frame 
     //
-    if lost_turn {
+    if lost_turn || lost_game {
         // @TODO: need to streamline this code, should it go at the end of update?
+        // @TODO: ball and paddle locations should be placed outside of function
         ball_diameter := f32(10)
         ball_pos_x    := f32(SCREEN_WIDTH / 2 - ball_diameter/2)    
         ball_pos_y    := f32(SCREEN_HEIGHT - 75)
-        entities[0] = {
-            id       = 0,
-            type     = .Ball,
-            visible  = true,
-            mobile   = true,
-            airdrag  = 0.0,
-            acc      = {0.0,0.0},
-            vel      = {0.0,-40.0},
-            pos      = {ball_pos_x, ball_pos_y},
-            bouncy   = true,
-            height   = f32(ball_diameter),
-            width    = f32(ball_diameter),
-            color    = rl.RAYWHITE
-        }
+        entities[0].acc = {0.0,0.0}
+        entities[0].vel = {0.0,-40.0}
+        entities[0].pos = {ball_pos_x, ball_pos_y}
 
         // paddle 
         paddle_width := 100 
         paddle_pos_x := f32(SCREEN_WIDTH / 2 - paddle_width/2)
-        entities[1] = {
-            id       = 0,
-            type     = .Paddle,
-            visible  = true,
-            mobile   = true,
-            airdrag  = 5.0,
-            acc      = {0.0,0.0},
-            vel      = {0.0,0.0},
-            pos      = {paddle_pos_x, f32(ball_pos_y + ball_diameter)},
-            bouncy   = false,
-            height   = 20,
-            width    = 100,
-            color    = rl.GREEN
-        }
+        entities[1].acc = {0.0,0.0}
+        entities[1].vel = {0.0,0.0}
+        entities[1].pos = {paddle_pos_x, f32(ball_pos_y + ball_diameter)}
+        
 
         lost_turn = false
         paused    = true
     }
 
+    if lost_game {
+        for i in 2..<56 {
+            entities[i].visible = true
+        }        
+    }
     ////////////////////////////////////////////////////////////////////////////
     // User input
     // 
