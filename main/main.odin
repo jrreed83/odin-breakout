@@ -10,6 +10,7 @@ import rl    "vendor:raylib"
 import vk    "vendor:vulkan"
 
 
+
 // @TODO: Determine the processor speed programatically
 PROCESSOR_HZ     :: 2_420_000_000
 SCREEN_WIDTH     :: 850
@@ -152,36 +153,12 @@ update_game :: proc () {
     ////////////////////////////////////////////////////////////////////////////
     // initialize for frame 
     //
-    if lost_turn || lost_game {
-        // @TODO: need to streamline this code, should it go at the end of update?
-        // @TODO: ball and paddle locations should be placed outside of function
-        ball_diameter := f32(10)
-        ball_pos_x    := f32(SCREEN_WIDTH / 2 - ball_diameter/2)    
-        ball_pos_y    := f32(SCREEN_HEIGHT - 75)
-        entities[0].acc = {0.0,0.0}
-        entities[0].vel = {0.0,-40.0}
-        entities[0].pos = {ball_pos_x, ball_pos_y}
 
-        // paddle 
-        paddle_width := 100 
-        paddle_pos_x := f32(SCREEN_WIDTH / 2 - paddle_width/2)
-        entities[1].acc = {0.0,0.0}
-        entities[1].vel = {0.0,0.0}
-        entities[1].pos = {paddle_pos_x, f32(ball_pos_y + ball_diameter)}
-        
 
-        lost_turn = false
-        paused    = true
-    }
-
-    if lost_game {
-        for i in 2..<56 {
-            entities[i].visible = true
-        }        
-    }
     ////////////////////////////////////////////////////////////////////////////
     // User input
     // 
+
     if rl.IsKeyPressed(.SPACE) {
         paused = !paused
     }
@@ -254,8 +231,7 @@ update_game :: proc () {
 
                         // @TODO: This is way too specific
                         score += test_entity.points
-
-                        fmt.println(score)      
+    
                         // @TODO: Revisit this edge detection scheme.  Want to use a predictive/continuous collision detection approach
 
 
@@ -338,7 +314,6 @@ update_game :: proc () {
 
                 if turns_left == 0 {
                     lost_game = true
-                    score = 0
                 } 
             }
 
@@ -359,8 +334,33 @@ update_game :: proc () {
             }
         }
     }
+
 }
 
+
+reset_ball_and_paddle :: proc() {
+    // @TODO: need to streamline this code, should it go at the end of update?
+    // @TODO: ball and paddle locations should be placed outside of function
+    ball_diameter := f32(10)
+    ball_pos_x    := f32(SCREEN_WIDTH / 2 - ball_diameter/2)    
+    ball_pos_y    := f32(SCREEN_HEIGHT - 75)
+    entities[0].acc = {0.0,0.0}
+    entities[0].vel = {0.0,-40.0}
+    entities[0].pos = {ball_pos_x, ball_pos_y}
+
+    // paddle 
+    paddle_width := 100 
+    paddle_pos_x := f32(SCREEN_WIDTH / 2 - paddle_width/2)
+    entities[1].acc = {0.0,0.0}
+    entities[1].vel = {0.0,0.0}
+    entities[1].pos = {paddle_pos_x, f32(ball_pos_y + ball_diameter)}
+}
+
+reset_bricks :: proc() {
+    for i in 2..<56 {
+        entities[i].visible = true
+    }    
+}
 
 setup_game :: proc() {
     // ball ...
@@ -481,9 +481,29 @@ main :: proc() {
     for !rl.WindowShouldClose() {
         
         ///////////////////////////////////////////////////////////////////////
+        // Initial set up
+        //
+        if lost_game {
+            if rl.IsKeyPressed(.ENTER) {
+                reset_ball_and_paddle()
+                reset_bricks()
+                lost_turn = false
+                lost_game = false
+                paused    = true                
+            }
+        } else if lost_turn {
+            reset_ball_and_paddle()
+            lost_turn = false
+            paused    = true   
+        } 
+
+
+        ///////////////////////////////////////////////////////////////////////
         // Update the physics
         //
-        update_game() 
+        if !lost_turn {
+            update_game()
+        } 
 
         ///////////////////////////////////////////////////////////////////////
         // Rendering: 
@@ -511,6 +531,13 @@ main :: proc() {
                 draw_entity(entity)
             }
         }
+
+        if lost_game {
+            str : cstring = "HIT ENTER TO PLAY AGAIN"
+            width := rl.MeasureText(str, 32);
+            rl.DrawText(str, SCREEN_WIDTH/2 - width/2, SCREEN_HEIGHT/2, 32, rl.RED)    
+        }
+
         rl.EndDrawing()
 
         //////////////////////////////////////////////////////////////////////
@@ -523,9 +550,8 @@ main :: proc() {
         
     }
 
-    // Open a level
-    fid, _ := os.open("level_1.txt")
+    // Open a level 
 
-    defer os.close(fid) 
+    parse_level_file()
 }
 
