@@ -408,7 +408,7 @@ setup_game :: proc() {
 
     height := f32(30)
     width  := f32(60) 
-    space  := f32(5) 
+    space  := f32(1) 
 
     grid_width := 9 * width + 8 * space
     grid_min_x := (f32(SCREEN_WIDTH) - f32(grid_width)) / 2 
@@ -489,7 +489,8 @@ main :: proc() {
                 reset_bricks()
                 lost_turn = false
                 lost_game = false
-                paused    = true                
+                paused    = true 
+                score     = 0               
             }
         } else if lost_turn {
             reset_ball_and_paddle()
@@ -523,7 +524,7 @@ main :: proc() {
 
         rl.ClearBackground(BACKGROUND_COLOR)
 
-        rl.DrawText(rl.TextFormat("Score: %d", score), 10, SCREEN_HEIGHT - 32, 32, rl.RAYWHITE)
+        rl.DrawText(rl.TextFormat("Score: %03d", score), 10, SCREEN_HEIGHT - 32, 32, rl.RAYWHITE)
         rl.DrawText(rl.TextFormat("Turns Left: %d", turns_left), 500, SCREEN_HEIGHT - 32, 32, rl.RAYWHITE)
         for i in 0..<NUM_ENTITIES {
             entity := &entities[i]
@@ -533,6 +534,7 @@ main :: proc() {
         }
 
         if lost_game {
+            // @TODO: Should probably so this text location and measurement ahead of time
             str : cstring = "HIT ENTER TO PLAY AGAIN"
             width := rl.MeasureText(str, 32);
             rl.DrawText(str, SCREEN_WIDTH/2 - width/2, SCREEN_HEIGHT/2, 32, rl.RED)    
