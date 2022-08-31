@@ -71,7 +71,7 @@ EntityType :: enum u8 {
     Ball,
     Paddle,
     Brick,
-    Wall
+    Bonus
 }
 
 
@@ -125,7 +125,7 @@ Entity :: struct {
 
 
 // @TODO: want a single array of entities, indices to separate types of entities into groups
-NUM_ENTITIES :: 56 // BRICK_IDX + 60
+NUM_ENTITIES :: 57 // BRICK_IDX + 60
 
 
 entities : [NUM_ENTITIES] Entity
@@ -147,6 +147,7 @@ colors : []rl.Color = {
     rl.ORANGE, 
     rl.YELLOW}
 
+bonus_dropped_already := false
 
 update_game :: proc () {
 
@@ -256,6 +257,12 @@ update_game :: proc () {
                             // bottom edge
                             trial_entity.vel.y = -trial_entity.vel.y
                         }
+
+                        // @TODO: Need more systematic way to handle bonus dropping 
+                        if !bonus_dropped_already {
+                            entities[56].visible = true 
+                            entities[56].vel.y   = +10
+                        }    
                     }
 
                     if trial_entity.type == .Ball && test_entity.type == .Paddle {
@@ -285,6 +292,11 @@ update_game :: proc () {
                             // bottom edge
                             trial_entity.vel.y = -trial_entity.vel.y
                         }
+                    }
+
+                    if trial_entity.type == .Bonus && test_entity.type == .Paddle {
+                        trial_entity.visible = false 
+                        test_entity.color = rl.RED
                     }
                 }
             }
@@ -333,6 +345,10 @@ update_game :: proc () {
                 entity.pos.y = SCREEN_HEIGHT - entity.height
             }
         }
+
+        if entity.type == .Bonus {
+            // What to do here??
+        }
     }
 
 }
@@ -357,9 +373,11 @@ reset_ball_and_paddle :: proc() {
 }
 
 reset_bricks :: proc() {
-    for i in 2..<56 {
-        entities[i].visible = true
-    }    
+    for i in 0..<NUM_ENTITIES {
+        if entities[i].type == .Brick {
+            entities[i].visible = true    
+        }
+    }
 }
 
 setup_game :: proc() {
@@ -395,7 +413,6 @@ setup_game :: proc() {
         vel      = {0.0,0.0},
         pos      = {paddle_pos_x, f32(ball_pos_y + ball_diameter)},
         bouncy   = false,
-        path     = "ball.png",
         height   = 20,
         width    = 100,
         color    = rl.GREEN
@@ -414,7 +431,7 @@ setup_game :: proc() {
     grid_min_x := (f32(SCREEN_WIDTH) - f32(grid_width)) / 2 
 
     xpos: f32 = grid_min_x
-    ypos: f32 = 50
+    ypos: f32 = 50.0
 
     for i in 2..<56 {
 
@@ -439,6 +456,18 @@ setup_game :: proc() {
             col   = 0
         }
     }
+
+    // Bonuses
+    entities[56] = {
+        id      = 56,
+        type    = .Bonus,
+        visible = false,
+        height  = 20,
+        width   = 40,
+        color   = rl.GRAY,
+        pos     = {200.0, 75.0},
+        mobile  = true
+    } 
 
 }
 
