@@ -149,6 +149,7 @@ colors : []rl.Color = {
 
 bonus_dropped_already := false
 
+handle_collision :: proc ()
 update_game :: proc () {
 
     ////////////////////////////////////////////////////////////////////////////
