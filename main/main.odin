@@ -584,6 +584,6 @@ main :: proc() {
 
     // Open a level 
 
-    parse_level_file()
+    //parse_level_file()
 }
 
