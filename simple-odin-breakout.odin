@@ -1,4 +1,4 @@
-package main
+package breakout
 
 import       "core:fmt"
 import       "core:os"
@@ -6,8 +6,6 @@ import       "core:math"
 import       "core:math/linalg"
 import       "core:time"
 import rl    "vendor:raylib"
-//import libc  "core:c/libc"
-import vk    "vendor:vulkan"
 
 
 
@@ -582,8 +580,5 @@ main :: proc() {
         
     }
 
-    // Open a level 
-
-    //parse_level_file()
 }
 
